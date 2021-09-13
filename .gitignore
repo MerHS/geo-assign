@@ -32,5 +32,6 @@
 *.app
 
 # Project specific
-bezier/bezier
+cpp-bezier/bezier
 rs-bezier/target
+iced-bezier/target
