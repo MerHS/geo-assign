@@ -1,20 +1,28 @@
 use iced::{
     canvas::event::{self, Event},
     canvas::{self, Canvas, Cursor, Frame, Geometry, Path, Stroke},
-    mouse, Element, Length, Point, Rectangle,
+    mouse, Color, Element, Length, Point, Rectangle,
 };
 
 use crate::util::*;
 
 const RESOLUTION: usize = 100;
+const PTS_RADIUS: f32 = 3.0;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Control {
+    Moving(usize, Point),
+    Static,
+}
+
+#[derive(Debug)]
 pub struct State {
     cache: canvas::Cache,
     curve: BezierCurve,
-    is_dotted: bool,
-    is_meshed: bool,
-    num_biarc: usize,
+    control: Control,
+    pub is_dotted: bool,
+    pub is_meshed: bool,
+    pub num_biarc: usize,
 }
 
 impl State {
@@ -22,6 +30,7 @@ impl State {
         State {
             cache: Default::default(),
             curve: Default::default(),
+            control: Control::Static,
             is_dotted: false,
             is_meshed: true,
             num_biarc: 2,
@@ -30,6 +39,55 @@ impl State {
 
     pub fn request_redraw(&mut self) {
         self.cache.clear()
+    }
+
+    pub fn toggle_dotted(&mut self) {
+        self.is_dotted = !self.is_dotted;
+        self.request_redraw();
+    }
+
+    pub fn toggle_meshed(&mut self) {
+        self.is_meshed = !self.is_meshed;
+        self.request_redraw();
+    }
+
+    pub fn set_num_biarc(&mut self, num_biarc: usize) {
+        self.num_biarc = num_biarc;
+        self.request_redraw();
+    }
+
+    fn draw_frame(&self, frame: &mut Frame) {
+        // draw control meshes
+        if self.is_meshed {
+            let mesh = Path::new(|p| {
+                let pts = self.curve.control_pts;
+                p.move_to(pts[0]);
+                for i in 1..4 {
+                    p.line_to(pts[i]);
+                }
+            });
+            frame.stroke(
+                &mesh,
+                Stroke::default()
+                    .with_width(2.0)
+                    .with_color(Color::from_rgba8(20, 210, 0, 1.0)),
+            );
+        }
+
+        // draw bezier curve
+        self.curve.draw(frame);
+        frame.stroke(
+            &Path::rectangle(Point::ORIGIN, frame.size()),
+            Stroke::default(),
+        );
+
+        // draw control points
+        for ctr_point in self.curve.control_pts {
+            let point_circ = Path::circle(ctr_point, PTS_RADIUS * 2.0);
+            frame.fill(&point_circ, Color::from_rgba8(255, 0, 0, 1.0));
+        }
+
+        // TODO: draw biarcs
     }
 }
 
@@ -47,63 +105,68 @@ impl<Message> canvas::Program<Message> for State {
         };
 
         match event {
-            Event::Mouse(mouse_event) => {
-                let message = match mouse_event {
-                    mouse::Event::ButtonPressed(mouse::Button::Left) => None,
-                    //     match self.state.pending {
-                    //     None => {
-                    //         self.state.pending = Some(Pending::One {
-                    //             from: cursor_position,
-                    //         });
+            Event::Mouse(mouse_event) => match mouse_event {
+                mouse::Event::ButtonPressed(mouse::Button::Left) => {
+                    for i in 0..4 {
+                        let ctr_pts = self.curve.control_pts[i];
 
-                    //         None
-                    //     }
-                    //     Some(Pending::One { from }) => {
-                    //         self.state.pending = Some(Pending::Two {
-                    //             from,
-                    //             to: cursor_position,
-                    //         });
-
-                    //         None
-                    //     }
-                    //     Some(Pending::Two { from, to }) => {
-                    //         self.state.pending = None;
-
-                    //         Some(Curve {
-                    //             from,
-                    //             to,
-                    //             control: cursor_position,
-                    //         })
-                    //     }
-                    // },
-                    _ => None,
-                };
-
-                (event::Status::Captured, message)
-            }
+                        // make clickable range * 1.5
+                        let local_rad = PTS_RADIUS * 1.5;
+                        let pts_bound = Rectangle {
+                            x: bounds.x + ctr_pts.x - local_rad,
+                            y: bounds.y + ctr_pts.y - local_rad,
+                            height: 2.0 * local_rad,
+                            width: 2.0 * local_rad,
+                        };
+                        if let Some(in_pos) = cursor.position_in(&pts_bound) {
+                            self.control = Control::Moving(
+                                i,
+                                Point {
+                                    x: pts_bound.x + in_pos.x,
+                                    y: pts_bound.y + in_pos.y,
+                                },
+                            );
+                            break;
+                        }
+                    }
+                    (event::Status::Captured, None)
+                }
+                mouse::Event::CursorMoved { position } => {
+                    if let Control::Moving(idx, _) = self.control {
+                        let pts = Point {
+                            x: position.x - bounds.x,
+                            y: position.y - bounds.y,
+                        };
+                        self.control = Control::Moving(idx, pts);
+                        self.curve.control_pts[idx] = pts;
+                    }
+                    (event::Status::Captured, None)
+                }
+                mouse::Event::ButtonReleased(mouse::Button::Left) => {
+                    if let Control::Moving(_, _) = self.control {
+                        self.control = Control::Static;
+                        self.cache.clear();
+                    }
+                    (event::Status::Captured, None)
+                }
+                _ => (event::Status::Ignored, None),
+            },
             _ => (event::Status::Ignored, None),
         }
     }
 
     fn draw(&self, bounds: Rectangle, cursor: Cursor) -> Vec<Geometry> {
-        let content = self.cache.draw(bounds.size(), |frame: &mut Frame| {
-            self.curve.draw(frame);
-
-            frame.stroke(
-                &Path::rectangle(Point::ORIGIN, frame.size()),
-                Stroke::default(),
-            );
-        });
-
-        vec![content]
-
-        // if let Some(pending) = &self.state.pending {
-        //     let pending_curve = pending.draw(bounds, cursor);
-
-        //     vec![content, pending_curve]
-        // } else {
-        //     vec![content]
-        // }
+        if Control::Static == self.control {
+            let content = self.cache.draw(bounds.size(), |frame: &mut Frame| {
+                self.draw_frame(frame);
+            });
+            vec![content]
+        } else {
+            let mut frame = Frame::new(bounds.size());
+            self.draw_frame(&mut frame);
+            let content = frame.into_geometry();
+            vec![content]
+        }
     }
 
     fn mouse_interaction(&self, bounds: Rectangle, cursor: Cursor) -> mouse::Interaction {

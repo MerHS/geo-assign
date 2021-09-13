@@ -8,7 +8,7 @@ pub mod biarc;
 pub mod util;
 
 pub fn main() -> iced::Result {
-    Example::run(Settings {
+    Bezier::run(Settings {
         antialiasing: true,
         window: window::Settings {
             size: (720, 480),
@@ -18,8 +18,7 @@ pub fn main() -> iced::Result {
     })
 }
 
-#[derive(Default)]
-struct Example {
+struct Bezier {
     canvas: biarc::State,
 }
 
@@ -31,13 +30,18 @@ enum Message {
     SetBiarc(usize),
 }
 
-impl Application for Example {
+impl Application for Bezier {
     type Executor = executor::Default;
     type Message = Message;
     type Flags = ();
 
     fn new(_flags: ()) -> (Self, Command<Message>) {
-        (Example::default(), Command::none())
+        (
+            Bezier {
+                canvas: biarc::State::new(),
+            },
+            Command::none(),
+        )
     }
 
     fn title(&self) -> String {
@@ -47,16 +51,16 @@ impl Application for Example {
     fn update(&mut self, message: Message, _clipboard: &mut Clipboard) -> Command<Message> {
         match message {
             Message::Initialize => {
-                self.canvas = biarc::State::default();
+                self.canvas = biarc::State::new();
             }
             Message::ToggleDotted => {
-                self.canvas.request_redraw();
+                self.canvas.toggle_dotted();
             }
             Message::ToggleMesh => {
-                self.canvas.request_redraw();
+                self.canvas.toggle_meshed();
             }
             Message::SetBiarc(num_biarc) => {
-                self.canvas.request_redraw();
+                self.canvas.set_num_biarc(num_biarc);
             }
         }
 
