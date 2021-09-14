@@ -75,7 +75,7 @@ impl State {
         }
 
         // draw bezier curve
-        self.curve.draw(frame);
+        self.curve.draw(frame, self.is_dotted);
         frame.stroke(
             &Path::rectangle(Point::ORIGIN, frame.size()),
             Stroke::default(),
@@ -184,14 +184,25 @@ pub struct BezierCurve {
 }
 
 impl BezierCurve {
-    fn draw(&self, frame: &mut Frame) {
+    fn draw(&self, frame: &mut Frame, is_dotted: bool) {
         let curve = Path::new(|p| {
             let mut point = Point::default();
+            let mut dot_start = true;
             p.move_to(self.control_pts[0]);
             for i in 1..=RESOLUTION {
                 let t = (i as f32) / (RESOLUTION as f32);
                 self.cubic_curve_to(&mut point, t);
-                p.line_to(point);
+
+                if is_dotted {
+                    if dot_start {
+                        p.line_to(point);
+                    } else {
+                        p.move_to(point);
+                    }
+                    dot_start = !dot_start;
+                } else {
+                    p.line_to(point);
+                }
             }
         });
 
