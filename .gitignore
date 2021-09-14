@@ -35,3 +35,13 @@
 cpp-bezier/bezier
 rs-bezier/target
 iced-bezier/target
+assign1/bezier
+assign1/bezier-button
+assign1/Cargo.lock
+assign1/Cargo.toml
+assign1/README.md
+assign1/src/biarc.rs
+assign1/src/main.rs
+assign1/src/util.rs
+assign1-preprint.zip
+assign1.zip
