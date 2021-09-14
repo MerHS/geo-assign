@@ -263,6 +263,9 @@ impl BezierCurve {
         }
 
         let delta = 1.0 / (pow_biarc as f32);
+        let mut start = Point::default();
+        let mut end = Point::default();
+        let mut control = Point::default();
         let mut u0 = Point::default();
         let mut u1 = Point::default();
         let mut mid0 = Point::default();
@@ -272,48 +275,86 @@ impl BezierCurve {
         let mut center = Point::default();
         for (i, arc) in arcs.iter_mut().enumerate() {
             let t = delta * (i as f32);
-            self.cubic_curve_to(&mut arc.start, t);
+            self.cubic_curve_to(&mut start, t);
             self.cubic_deriv_to(&mut u0, t);
             normalize(&mut u0);
 
-            self.cubic_curve_to(&mut arc.end, t + delta);
+            self.cubic_curve_to(&mut end, t + delta);
             self.cubic_deriv_to(&mut u1, t + delta);
             normalize(&mut u1);
 
             // calculate the center of joint circle
-            mid0.x = (arc.start.x + arc.end.x) / 2.0;
-            mid0.y = (arc.start.y + arc.end.y) / 2.0;
-            mid1.x = (arc.start.x + u0.x + arc.end.x + u1.x) / 2.0;
-            mid1.y = (arc.start.y + u0.y + arc.end.y + u1.y) / 2.0;
-            v0.x = arc.end.y - arc.start.y;
-            v0.y = -(arc.end.x - arc.start.x);
-            v1.x = (arc.end.y + u1.y) - (arc.start.y + u0.y);
-            v1.y = (arc.start.x + u0.x) - (arc.end.x + u1.x);
+            mid0.x = (start.x + end.x) / 2.0;
+            mid0.y = (start.y + end.y) / 2.0;
+            mid1.x = (start.x + u0.x + end.x + u1.x) / 2.0;
+            mid1.y = (start.y + u0.y + end.y + u1.y) / 2.0;
+            v0.x = end.y - start.y;
+            v0.y = -(end.x - start.x);
+            v1.x = (end.y + u1.y) - (start.y + u0.y);
+            v1.y = (start.x + u0.x) - (end.x + u1.x);
             ray_intersection(&mid0, &v0, &mid1, &v1, &mut center);
 
             // calculate radius and control point
-            let radius = distance(&center, &arc.start);
-            let theta = vec_angle(&center, &mid0);
-            arc.control.x = center.x + (radius * theta.cos()) as f32;
-            arc.control.y = center.y + (radius * theta.sin()) as f32;
+            let radius = distance(&center, &start);
+            let theta = point_angle(&center, &mid0);
+            control.x = center.x + (radius * theta.cos()) as f32;
+            control.y = center.y + (radius * theta.sin()) as f32;
 
-            // calculate the center of left arc
-            mid0.x = (arc.start.x + arc.control.x) / 2.0;
-            mid0.y = (arc.start.y + arc.control.y) / 2.0;
+            // calculate the center and angles of left arc
+            mid0.x = (start.x + control.x) / 2.0;
+            mid0.y = (start.y + control.y) / 2.0;
             v0.x = u0.y;
             v0.y = -u0.x;
-            v1.x = arc.control.y - arc.start.y;
-            v1.y = -(arc.control.x - arc.start.x);
-            ray_intersection(&arc.start, &v0, &mid0, &v1, &mut arc.center_left);
+            v1.x = control.y - start.y;
+            v1.y = -(control.x - start.x);
+            ray_intersection(&start, &v0, &mid0, &v1, &mut arc.center_left);
 
-            // calculate the center of right arc
-            mid1.x = (arc.end.x + arc.control.x) / 2.0;
-            mid1.y = (arc.end.y + arc.control.y) / 2.0;
+            let mid_left = Point {
+                x: (control.x + start.x) / 2.0,
+                y: (control.y + start.y) / 2.0,
+            };
+            arc.rad_left = distance(&arc.center_left, &start) as f32;
+            arc.theta_l0 = point_angle(&arc.center_left, &start);
+            arc.theta_l2 = point_angle(&arc.center_left, &control);
+
+            // is left arc is larger than half-circle?
+            mid1.x = control.x - start.x;
+            mid1.y = control.y - start.y;
+            let l1_angle = vec_angle(&mid1, &u0);
+            arc.theta_l1 = point_angle(&arc.center_left, &mid_left);
+
+            // then invert mid-angle
+            if l1_angle > std::f64::consts::FRAC_PI_2 {
+                arc.theta_l1 = invert_angle(arc.theta_l1);
+            }
+
+            // calculate the center and angles of right arc
+            mid1.x = (end.x + control.x) / 2.0;
+            mid1.y = (end.y + control.y) / 2.0;
             v1.x = u1.y;
             v1.y = -u1.x;
-            v0.x = arc.control.y - arc.end.y;
-            v0.y = -(arc.control.x - arc.end.x);
-            ray_intersection(&arc.end, &v1, &mid1, &v0, &mut arc.center_right);
+            v0.x = control.y - end.y;
+            v0.y = -(control.x - end.x);
+            ray_intersection(&end, &v1, &mid1, &v0, &mut arc.center_right);
+
+            let mid_right = Point {
+                x: (control.x + end.x) / 2.0,
+                y: (control.y + end.y) / 2.0,
+            };
+            arc.rad_right = distance(&arc.center_right, &end) as f32;
+            arc.theta_r0 = point_angle(&arc.center_right, &control);
+            arc.theta_r2 = point_angle(&arc.center_right, &end);
+
+            // is right arc is larger than half-circle?
+            mid0.x = end.x - control.x;
+            mid0.y = end.y - control.y;
+            let r1_angle = vec_angle(&mid0, &u1);
+            arc.theta_r1 = point_angle(&arc.center_right, &mid_right);
+
+            // then invert mid-angle
+            if r1_angle > std::f64::consts::FRAC_PI_2 {
+                arc.theta_r1 = invert_angle(arc.theta_r1);
+            }
         }
     }
 }
@@ -333,9 +374,14 @@ impl Default for BezierCurve {
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Biarc {
-    start: Point,
-    control: Point,
-    end: Point,
+    theta_l0: f64,
+    theta_l1: f64,
+    theta_l2: f64,
+    theta_r0: f64,
+    theta_r1: f64,
+    theta_r2: f64,
+    rad_left: f32,
+    rad_right: f32,
     center_left: Point,
     center_right: Point,
 }
@@ -343,59 +389,51 @@ pub struct Biarc {
 impl Biarc {
     fn draw(&self, frame: &mut Frame) {
         let left_curve = Path::new(|p| {
-            let start = self.start;
-            let control = self.control;
-            let center_left = self.center_left;
-            // draw left
-            let mid_left = Point {
-                x: (control.x + start.x) / 2.0,
-                y: (control.y + start.y) / 2.0,
-            };
-            let radius_left = distance(&center_left, &start);
-            let theta_left = vec_angle(&center_left, &start);
-            let theta_mid = vec_angle(&center_left, &mid_left);
-            let theta_cnt = vec_angle(&center_left, &control);
-
-            Biarc::draw_arc(p, &center_left, radius_left as f32, theta_left, theta_mid);
-            Biarc::draw_arc(p, &center_left, radius_left as f32, theta_mid, theta_cnt);
-            let pi = std::f64::consts::PI;
-            println!(
-                "{:>6.3} {:>6.3} {:>6.3}",
-                180.0 * theta_left / pi,
-                180.0 * theta_mid / pi,
-                180.0 * theta_cnt / pi
+            Biarc::draw_arc(
+                p,
+                &self.center_left,
+                self.rad_left,
+                self.theta_l0,
+                self.theta_l1,
             );
+            Biarc::draw_arc(
+                p,
+                &self.center_left,
+                self.rad_left,
+                self.theta_l1,
+                self.theta_l2,
+            );
+            // let pi = std::f64::consts::PI;
+            // println!(
+            //     "{:>6.3} {:>6.3} {:>6.3}",
+            //     180.0 * self.theta_l0 / pi,
+            //     180.0 * self.theta_l1 / pi,
+            //     180.0 * self.theta_l2 / pi
+            // );
         });
 
         let right_curve = Path::new(|p| {
-            let control = self.control;
-            let end = self.end;
-            let center_right = self.center_right;
-            // draw left
-            let mid_right = Point {
-                x: (control.x + end.x) / 2.0,
-                y: (control.y + end.y) / 2.0,
-            };
-            let radius_right = distance(&center_right, &end);
-            let theta_cnt = vec_angle(&center_right, &control);
-            let theta_mid = vec_angle(&center_right, &mid_right);
-            let theta_right = vec_angle(&center_right, &end);
-
-            Biarc::draw_arc(p, &center_right, radius_right as f32, theta_cnt, theta_mid);
             Biarc::draw_arc(
                 p,
-                &center_right,
-                radius_right as f32,
-                theta_mid,
-                theta_right,
+                &self.center_right,
+                self.rad_right as f32,
+                self.theta_r0,
+                self.theta_r1,
             );
-            let pi = std::f64::consts::PI;
-            println!(
-                "{:>6.3} {:>6.3} {:>6.3}",
-                180.0 * theta_cnt / pi,
-                180.0 * theta_mid / pi,
-                180.0 * theta_right / pi
+            Biarc::draw_arc(
+                p,
+                &self.center_right,
+                self.rad_right as f32,
+                self.theta_r1,
+                self.theta_r2,
             );
+            // let pi = std::f64::consts::PI;
+            // println!(
+            //     "{:>6.3} {:>6.3} {:>6.3}",
+            //     180.0 * self.theta_r0 / pi,
+            //     180.0 * self.theta_r1 / pi,
+            //     180.0 * self.theta_r2 / pi
+            // );
         });
 
         frame.stroke(
@@ -421,17 +459,24 @@ impl Biarc {
     ) -> () {
         let mut angle0 = theta0;
         let mut angle1 = theta1;
-        if angle0 < -std::f64::consts::FRAC_PI_2 && std::f64::consts::FRAC_PI_2 < angle1 {
+
+        if angle0 < 0.0 {
             angle0 += 2.0 * std::f64::consts::PI;
-        } else if angle0 > std::f64::consts::FRAC_PI_2 && -std::f64::consts::FRAC_PI_2 > angle1 {
+        }
+        if angle1 < 0.0 {
             angle1 += 2.0 * std::f64::consts::PI;
         }
+
+        let delta = if (angle1 - angle0).abs() > std::f64::consts::PI {
+            (angle0 - angle1) / (RES_4 as f64)
+        } else {
+            (angle1 - angle0) / (RES_4 as f64)
+        };
 
         let mut point = Point {
             x: center.x + radius * (angle0.cos() as f32),
             y: center.y + radius * (angle0.sin() as f32),
         };
-        let delta = (angle1 - angle0) / (RES_4 as f64);
         p.move_to(point);
         for _ in 1..=RES_4 {
             angle0 += delta;

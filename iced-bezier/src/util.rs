@@ -38,7 +38,7 @@ pub fn distance(p0: &Point, p1: &Point) -> f64 {
 
 /// Calculate angle aligned to +x-axis
 /// return (-pi, pi]
-pub fn vec_angle(center: &Point, vec: &Point) -> f64 {
+pub fn point_angle(center: &Point, vec: &Point) -> f64 {
     if vec.x == center.x {
         if vec.y >= center.y {
             std::f64::consts::FRAC_PI_2
@@ -60,6 +60,21 @@ pub fn vec_angle(center: &Point, vec: &Point) -> f64 {
     }
 }
 
+const ORIGIN: Point = Point { x: 0.0, y: 0.0 };
+
+/// Calculate the angle between two vectors.
+/// return [0, pi]
+pub fn vec_angle(v0: &Point, v1: &Point) -> f64 {
+    let theta_1 = point_angle(&ORIGIN, v0);
+    let theta_2 = point_angle(&ORIGIN, v1);
+
+    let mut theta = (theta_2 - theta_1).abs();
+    if theta > std::f64::consts::PI {
+        theta = 2.0 * std::f64::consts::PI - theta;
+    }
+    theta
+}
+
 pub fn norm(point: &Point) -> f32 {
     f64::sqrt((point.x * point.x + point.y * point.y) as f64) as f32
 }
@@ -68,4 +83,15 @@ pub fn normalize(point: &mut Point) -> () {
     let len = norm(point);
     point.x = point.x / len;
     point.y = point.y / len;
+}
+
+// add 180 degree to angle
+pub fn invert_angle(angle: f64) -> f64 {
+    let mut ret = angle + std::f64::consts::PI;
+    if ret > std::f64::consts::PI {
+        ret -= 2.0 * std::f64::consts::PI;
+    } else if ret < -std::f64::consts::PI {
+        ret += 2.0 * std::f64::consts::PI;
+    }
+    ret
 }
