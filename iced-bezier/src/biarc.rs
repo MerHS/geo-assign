@@ -403,13 +403,13 @@ impl Biarc {
                 self.theta_l1,
                 self.theta_l2,
             );
-            // let pi = std::f64::consts::PI;
-            // println!(
-            //     "{:>6.3} {:>6.3} {:>6.3}",
-            //     180.0 * self.theta_l0 / pi,
-            //     180.0 * self.theta_l1 / pi,
-            //     180.0 * self.theta_l2 / pi
-            // );
+            let pi = std::f64::consts::PI;
+            println!(
+                "{:>6.3} {:>6.3} {:>6.3}",
+                180.0 * self.theta_l0 / pi,
+                180.0 * self.theta_l1 / pi,
+                180.0 * self.theta_l2 / pi
+            );
         });
 
         let right_curve = Path::new(|p| {
@@ -427,13 +427,13 @@ impl Biarc {
                 self.theta_r1,
                 self.theta_r2,
             );
-            // let pi = std::f64::consts::PI;
-            // println!(
-            //     "{:>6.3} {:>6.3} {:>6.3}",
-            //     180.0 * self.theta_r0 / pi,
-            //     180.0 * self.theta_r1 / pi,
-            //     180.0 * self.theta_r2 / pi
-            // );
+            let pi = std::f64::consts::PI;
+            println!(
+                "{:>6.3} {:>6.3} {:>6.3}",
+                180.0 * self.theta_r0 / pi,
+                180.0 * self.theta_r1 / pi,
+                180.0 * self.theta_r2 / pi
+            );
         });
 
         frame.stroke(
@@ -458,20 +458,22 @@ impl Biarc {
         theta1: f64,
     ) -> () {
         let mut angle0 = theta0;
-        let mut angle1 = theta1;
+        let angle1 = theta1;
 
-        if angle0 < 0.0 {
-            angle0 += 2.0 * std::f64::consts::PI;
-        }
-        if angle1 < 0.0 {
-            angle1 += 2.0 * std::f64::consts::PI;
-        }
+        let mut delta = angle1 - angle0;
 
-        let delta = if (angle1 - angle0).abs() > std::f64::consts::PI {
-            (angle0 - angle1) / (RES_4 as f64)
+        // let delta below 180 degree.
+        if angle0 > 0.0 {
+            if delta < -std::f64::consts::PI {
+                delta = std::f64::consts::PI * 2.0 + delta;
+            }
         } else {
-            (angle1 - angle0) / (RES_4 as f64)
-        };
+            if delta > std::f64::consts::PI {
+                delta = delta - 2.0 * std::f64::consts::PI;
+            }
+        }
+
+        delta = delta / (RES_4 as f64);
 
         let mut point = Point {
             x: center.x + radius * (angle0.cos() as f32),
