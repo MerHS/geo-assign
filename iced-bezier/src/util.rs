@@ -36,7 +36,7 @@ pub fn distance(p0: &Point, p1: &Point) -> f64 {
     f64::sqrt(x * x + y * y)
 }
 
-/// Calculate angle align to x-axis
+/// Calculate angle aligned to +x-axis
 /// return (-pi, pi]
 pub fn vec_angle(center: &Point, vec: &Point) -> f64 {
     if vec.x == center.x {
@@ -46,8 +46,17 @@ pub fn vec_angle(center: &Point, vec: &Point) -> f64 {
             -std::f64::consts::FRAC_PI_2
         }
     } else {
-        let tan = ((vec.y - center.y) / (vec.x - center.x)) as f64;
-        tan.atan()
+        let dy = vec.y - center.y;
+        let dx = vec.x - center.x;
+        if dx < 0.0 {
+            if dy < 0.0 {
+                -std::f64::consts::PI + ((dy / dx) as f64).atan()
+            } else {
+                std::f64::consts::PI - ((-dy / dx) as f64).atan()
+            }
+        } else {
+            ((dy / dx) as f64).atan()
+        }
     }
 }
 
