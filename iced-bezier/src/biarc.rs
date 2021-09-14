@@ -403,13 +403,13 @@ impl Biarc {
                 self.theta_l1,
                 self.theta_l2,
             );
-            let pi = std::f64::consts::PI;
-            println!(
-                "{:>6.3} {:>6.3} {:>6.3}",
-                180.0 * self.theta_l0 / pi,
-                180.0 * self.theta_l1 / pi,
-                180.0 * self.theta_l2 / pi
-            );
+            // let pi = std::f64::consts::PI;
+            // println!(
+            //     "{:>6.3} {:>6.3} {:>6.3}",
+            //     180.0 * self.theta_l0 / pi,
+            //     180.0 * self.theta_l1 / pi,
+            //     180.0 * self.theta_l2 / pi
+            // );
         });
 
         let right_curve = Path::new(|p| {
@@ -427,13 +427,13 @@ impl Biarc {
                 self.theta_r1,
                 self.theta_r2,
             );
-            let pi = std::f64::consts::PI;
-            println!(
-                "{:>6.3} {:>6.3} {:>6.3}",
-                180.0 * self.theta_r0 / pi,
-                180.0 * self.theta_r1 / pi,
-                180.0 * self.theta_r2 / pi
-            );
+            // let pi = std::f64::consts::PI;
+            // println!(
+            //     "{:>6.3} {:>6.3} {:>6.3}",
+            //     180.0 * self.theta_r0 / pi,
+            //     180.0 * self.theta_r1 / pi,
+            //     180.0 * self.theta_r2 / pi
+            // );
         });
 
         frame.stroke(
