@@ -40,7 +40,7 @@ pub fn distance(p0: &Point, p1: &Point) -> f64 {
 /// return (-pi, pi]
 pub fn vec_angle(center: &Point, vec: &Point) -> f64 {
     if vec.x == center.x {
-        if vec.y >= vec.x {
+        if vec.y >= center.y {
             std::f64::consts::FRAC_PI_2
         } else {
             -std::f64::consts::FRAC_PI_2

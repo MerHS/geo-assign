@@ -92,7 +92,6 @@ impl State {
         // draw biarcs
         if self.is_meshed {
             for arc in self.arcs.iter() {
-                println!("{:?}", arc);
                 arc.draw(frame);
             }
         }
@@ -359,6 +358,13 @@ impl Biarc {
 
             Biarc::draw_arc(p, &center_left, radius_left as f32, theta_left, theta_mid);
             Biarc::draw_arc(p, &center_left, radius_left as f32, theta_mid, theta_cnt);
+            let pi = std::f64::consts::PI;
+            println!(
+                "{:>6.3} {:>6.3} {:>6.3}",
+                180.0 * theta_left / pi,
+                180.0 * theta_mid / pi,
+                180.0 * theta_cnt / pi
+            );
         });
 
         let right_curve = Path::new(|p| {
@@ -382,6 +388,13 @@ impl Biarc {
                 radius_right as f32,
                 theta_mid,
                 theta_right,
+            );
+            let pi = std::f64::consts::PI;
+            println!(
+                "{:>6.3} {:>6.3} {:>6.3}",
+                180.0 * theta_cnt / pi,
+                180.0 * theta_mid / pi,
+                180.0 * theta_right / pi
             );
         });
 
@@ -408,8 +421,9 @@ impl Biarc {
     ) -> () {
         let mut angle0 = theta0;
         let mut angle1 = theta1;
-        if (angle0 < 0.0 && 0.0 <= angle1) || (angle0 >= 0.0 && 0.0 > angle1) {
+        if angle0 < -std::f64::consts::FRAC_PI_2 && std::f64::consts::FRAC_PI_2 < angle1 {
             angle0 += 2.0 * std::f64::consts::PI;
+        } else if angle0 > std::f64::consts::FRAC_PI_2 && -std::f64::consts::FRAC_PI_2 > angle1 {
             angle1 += 2.0 * std::f64::consts::PI;
         }
 
