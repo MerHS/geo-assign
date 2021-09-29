@@ -4,7 +4,9 @@ use iced::{
 };
 use iced_native::{subscription, Event};
 
+pub mod bezier;
 pub mod biarc;
+pub mod tree;
 pub mod util;
 
 pub fn main() -> iced::Result {
@@ -19,7 +21,7 @@ pub fn main() -> iced::Result {
 }
 
 struct Bezier {
-    canvas: biarc::State,
+    canvas: bezier::State,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -38,7 +40,7 @@ impl Application for Bezier {
     fn new(_flags: ()) -> (Self, Command<Message>) {
         (
             Bezier {
-                canvas: biarc::State::new(),
+                canvas: bezier::State::new(),
             },
             Command::none(),
         )
@@ -51,7 +53,7 @@ impl Application for Bezier {
     fn update(&mut self, message: Message, _clipboard: &mut Clipboard) -> Command<Message> {
         match message {
             Message::Initialize => {
-                self.canvas = biarc::State::new();
+                self.canvas = bezier::State::new();
             }
             Message::ToggleDotted => {
                 self.canvas.toggle_dotted();

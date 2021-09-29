@@ -1,5 +1,9 @@
 use iced::Point;
 
+pub const RESOLUTION: usize = 100;
+pub const RES_4: usize = RESOLUTION / 4;
+pub const PTS_RADIUS: f32 = 3.0;
+
 pub fn point_clear(point: &mut Point) -> () {
     point.x = 0.0;
     point.y = 0.0;
