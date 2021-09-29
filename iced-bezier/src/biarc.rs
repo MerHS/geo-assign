@@ -82,7 +82,7 @@ pub struct ArcNode {
 
 impl ArcNode {
     pub fn draw_arc(&self, frame: &mut Frame, color: &Color) {
-        if let Some(arc) = self.arc {
+        if let Some(ref arc) = self.arc {
             arc.draw(frame, color)
         }
     }
