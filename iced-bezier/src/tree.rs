@@ -2,7 +2,9 @@
 //
 // https://rust-leipzig.github.io/architecture/2016/12/20/idiomatic-trees-in-rust/
 
+use std::cell::RefCell;
 use std::ops::Deref;
+use std::rc::Rc;
 
 // implicitly first node is top node
 #[derive(Debug)]
@@ -17,13 +19,6 @@ pub struct Node<T> {
     right: Option<usize>,
 
     pub value: T,
-}
-
-#[derive(Debug)]
-struct TreePostIterMut<'a, T> {
-    tree: &'a mut Tree<T>,
-    idx: usize,
-    stopped: bool,
 }
 
 impl<T> Tree<T> {
@@ -131,61 +126,11 @@ impl<T> Tree<T> {
         idx
     }
 
-    pub fn post_iter_mut<'a>(&'a mut self) -> impl Iterator<Item = &'a mut Node<T>> {
-        TreePostIterMut::new(self)
-    }
-}
-
-impl<'a, T> TreePostIterMut<'a, T> {
-    fn new(tree: &'a mut Tree<T>) -> Self {
-        if tree.nodes.len() == 0 {
-            return TreePostIterMut {
-                tree,
-                idx: 0,
-                stopped: true,
-            };
-        }
-        let mut idx: usize = tree.leftest_idx(0);
-        TreePostIterMut {
-            tree,
-            idx,
-            stopped: false,
-        }
-    }
-}
-
-impl<'a, T: 'a> Iterator for TreePostIterMut<'a, T> {
-    type Item = &'a mut Node<T>;
-    // explicit iterator
-    fn next(self: &'_ mut TreePostIterMut<'a, T>) -> Option<Self::Item> {
-        if self.stopped {
-            return None;
-        }
-
-        let curr_node_opt = self.tree.nodes.get_mut(self.idx);
-
-        if curr_node_opt.is_none() {
-            return None;
-        }
-
-        let curr_node = curr_node_opt?;
-        if let Some(parent) = self.tree.parent(curr_node) {
-            if parent.left.unwrap() == self.idx {
-                // come from left -> go to right
-                if self.tree.right(parent).is_some() {
-                    self.idx = self.tree.leftest_idx(parent.right?);
-                } else {
-                    self.idx = curr_node.parent?;
-                }
-            } else {
-                // come from right -> remain parent
-                self.idx = curr_node.parent?;
-            }
-        } else {
-            self.stopped = true;
-        }
-
-        curr_node_opt
+    pub fn post_trav<F>(tree: Rc<RefCell<Tree<T>>>, f: F)
+    where
+        F: FnMut(usize, &mut T),
+    {
+        Tree::post_trav(tree, f);
     }
 }
 
