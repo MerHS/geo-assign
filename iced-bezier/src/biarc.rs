@@ -82,9 +82,9 @@ pub struct ArcNode {
 
 impl ArcNode {
     pub fn arc_builder(depth: usize) -> Box<dyn Fn(usize) -> ArcNode> {
-        let left_id = 2usize.pow((depth - 1) as u32);
+        let leaf_id = 2usize.pow(depth as u32) - 1;
         Box::new(move |node_id| ArcNode {
-            arc: if node_id >= left_id {
+            arc: if node_id >= leaf_id {
                 Some(ArcData::default())
             } else {
                 None

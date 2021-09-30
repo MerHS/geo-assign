@@ -95,33 +95,6 @@ impl<T> Tree<T> {
         return Some(child_id);
     }
 
-    pub fn leftest_idx(&self, index: usize) -> usize {
-        let mut idx = index;
-        let mut node = self.get(idx).unwrap();
-
-        loop {
-            if let Some(left_id) = node.left {
-                if let Some(left) = self.get(left_id) {
-                    idx = left_id;
-                    node = left;
-                    continue;
-                }
-            }
-
-            if let Some(right_id) = node.right {
-                if let Some(right) = self.get(right_id) {
-                    idx = right_id;
-                    node = right;
-                    continue;
-                }
-            }
-
-            break;
-        }
-
-        idx
-    }
-
     pub fn post_trav<F>(tree_cell: Rc<RefCell<Tree<T>>>, mut f: F)
     where
         F: FnMut(&mut T),
@@ -166,14 +139,15 @@ impl<T> Tree<T> {
 }
 
 impl<T> Tree<T> {
+    // builder get zero-start node index
     pub fn new_complete<F>(depth: usize, builder: F) -> Self
     where
         F: Fn(usize) -> T,
     {
         let node_n = 2usize.pow((depth + 1) as u32);
-        let mut nodes: Vec<Node<T>> = Vec::with_capacity(node_n);
+        let mut nodes: Vec<Node<T>> = Vec::with_capacity(node_n - 1);
 
-        for i in 1..=node_n {
+        for i in 1..node_n {
             let parent = if i == 1 { None } else { Some(i / 2 - 1) };
             let left = if i >= node_n / 2 {
                 None

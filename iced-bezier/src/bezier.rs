@@ -286,15 +286,16 @@ impl BezierCurve {
     }
 
     fn build_biarc(&self, arc_cell: Rc<RefCell<Tree<ArcNode>>>, split_num: usize) -> () {
-        let node_n = 2usize.pow((split_num + 1) as u32);
-        let pow_biarc = node_n / 2;
+        let depth = split_num + 1;
+        let node_n = 2usize.pow((depth + 1) as u32) - 1;
+        let biarc_n = 2usize.pow(split_num as u32);
 
         if node_n != arc_cell.borrow().len() {
             let mut arc_mut = arc_cell.borrow_mut();
-            arc_mut.set_new_complete(split_num, ArcNode::arc_builder(split_num));
+            arc_mut.set_new_complete(depth, ArcNode::arc_builder(depth));
         }
 
-        let delta = 1.0 / (pow_biarc as f32);
+        let delta = 1.0 / (biarc_n as f32);
         let mut start = Point::default();
         let mut end = Point::default();
         let mut control = Point::default();
