@@ -22,10 +22,6 @@ pub struct Node<T> {
 }
 
 impl<T> Tree<T> {
-    pub fn new() -> Self {
-        Self { nodes: vec![] }
-    }
-
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
@@ -126,16 +122,54 @@ impl<T> Tree<T> {
         idx
     }
 
-    pub fn post_trav<F>(tree: Rc<RefCell<Tree<T>>>, f: F)
+    pub fn post_trav<F>(tree_cell: Rc<RefCell<Tree<T>>>, mut f: F)
     where
-        F: FnMut(usize, &mut T),
+        F: FnMut(&mut T),
     {
-        Tree::post_trav(tree, f);
+        if tree_cell.borrow().len() > 0 {
+            Tree::post_trav_inner(tree_cell.clone(), 0, &mut f);
+        }
+    }
+
+    fn post_trav_inner<F>(tree_cell: Rc<RefCell<Tree<T>>>, idx: usize, f: &mut F)
+    where
+        F: FnMut(&mut T),
+    {
+        let mut left_idx: usize = 0;
+        let mut right_idx: usize = 0;
+
+        {
+            let cell_ref = tree_cell.borrow();
+            if let Some(node) = cell_ref.get(idx) {
+                if cell_ref.left(node).is_some() {
+                    left_idx = node.left.unwrap();
+                }
+                if cell_ref.right(node).is_some() {
+                    right_idx = node.right.unwrap();
+                }
+            }
+        }
+
+        if left_idx > 0 {
+            Tree::post_trav_inner(tree_cell.clone(), left_idx, f);
+        }
+
+        if right_idx > 0 {
+            Tree::post_trav_inner(tree_cell.clone(), right_idx, f);
+        }
+
+        let mut tree = tree_cell.borrow_mut();
+        let value = &mut tree.nodes.get_mut(idx).unwrap().value;
+
+        f(value);
     }
 }
 
-impl<T: Default> Tree<T> {
-    pub fn new_complete(depth: usize) -> Self {
+impl<T> Tree<T> {
+    pub fn new_complete<F>(depth: usize, builder: F) -> Self
+    where
+        F: Fn(usize) -> T,
+    {
         let node_n = 2usize.pow((depth + 1) as u32);
         let mut nodes: Vec<Node<T>> = Vec::with_capacity(node_n);
 
@@ -152,15 +186,18 @@ impl<T: Default> Tree<T> {
                 parent,
                 left,
                 right,
-                value: Default::default(),
+                value: builder(i - 1),
             });
         }
 
         Self { nodes }
     }
 
-    pub fn set_new_complete(&mut self, depth: usize) -> () {
-        let complete = Tree::<T>::new_complete(depth);
+    pub fn set_new_complete<F>(&mut self, depth: usize, builder: F) -> ()
+    where
+        F: Fn(usize) -> T,
+    {
+        let complete = Tree::<T>::new_complete(depth, builder);
         self.nodes = complete.nodes;
     }
 }

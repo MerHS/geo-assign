@@ -81,6 +81,19 @@ pub struct ArcNode {
 }
 
 impl ArcNode {
+    pub fn arc_builder(depth: usize) -> Box<dyn Fn(usize) -> ArcNode> {
+        let left_id = 2usize.pow((depth - 1) as u32);
+        Box::new(move |node_id| ArcNode {
+            arc: if node_id >= left_id {
+                Some(ArcData::default())
+            } else {
+                None
+            },
+            aabb: Default::default(),
+            radius: 0.0,
+        })
+    }
+
     pub fn draw_arc(&self, frame: &mut Frame, color: &Color) {
         if let Some(ref arc) = self.arc {
             arc.draw(frame, color)
@@ -116,9 +129,9 @@ impl ArcNode {
                     x: x + w,
                     y: y + h + r,
                 });
-                p.line_to(Point { x: x, y: y + h + r });
+                p.line_to(Point { x, y: y + h + r });
                 p.move_to(Point { x: x - r, y: y + h });
-                p.line_to(Point { x: x - r, y: y });
+                p.line_to(Point { x: x - r, y });
 
                 // draw circle on vertex
                 // CAVEAT: the entire canvas is flipped upside-down
@@ -144,7 +157,7 @@ impl ArcNode {
                 });
 
                 p.arc(Arc {
-                    center: Point { x: x, y: y + h },
+                    center: Point { x, y: y + h },
                     radius: r,
                     start_angle: -std::f32::consts::FRAC_PI_2,
                     end_angle: -std::f32::consts::PI,

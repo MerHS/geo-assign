@@ -4,6 +4,9 @@ use iced::{
     mouse, Color, Point, Rectangle,
 };
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::biarc::*;
 use crate::tree::*;
 use crate::util::*;
@@ -18,21 +21,27 @@ pub enum Control {
 pub struct State {
     cache: canvas::Cache,
     curve: BezierCurve,
-    arcs: Tree<ArcNode>,
+    arcs: Rc<RefCell<Tree<ArcNode>>>,
     control: Control,
     pub is_dotted: bool,
     pub is_meshed: bool,
-    pub num_biarc: usize,
+    pub num_split: usize,
     pub left_color: Color,
     pub right_color: Color,
 }
 
 impl State {
     pub fn new() -> State {
-        let default_num_biarc = 1;
+        let default_num_split = 1;
         let curve = BezierCurve::default();
-        let mut arcs = Tree::new_complete(default_num_biarc + 1);
-        curve.build_biarc(&mut arcs, default_num_biarc);
+        let depth = default_num_split + 1;
+        let arcs = Rc::new(RefCell::new(Tree::new_complete(
+            depth,
+            ArcNode::arc_builder(depth),
+        )));
+
+        curve.build_biarc(arcs.clone(), default_num_split);
+
         State {
             cache: Default::default(),
             curve,
@@ -40,7 +49,7 @@ impl State {
             control: Control::Static,
             is_dotted: false,
             is_meshed: true,
-            num_biarc: default_num_biarc,
+            num_split: default_num_split,
             left_color: Color::from_rgba8(40, 210, 0, 1.0),
             right_color: Color::from_rgba8(30, 0, 210, 1.0),
         }
@@ -61,8 +70,8 @@ impl State {
     }
 
     pub fn set_num_biarc(&mut self, num_biarc: usize) {
-        self.num_biarc = num_biarc;
-        self.curve.build_biarc(&mut self.arcs, self.num_biarc);
+        self.num_split = num_biarc;
+        self.curve.build_biarc(self.arcs.clone(), self.num_split);
         self.request_redraw();
     }
 
@@ -93,9 +102,8 @@ impl State {
 
         // draw biarcs
         if self.is_meshed {
-            let head = self.arcs.get(0).unwrap();
             let mut color_idx: i64 = 0;
-            self.draw_node(frame, &head, &mut color_idx);
+            self.draw_node(frame, self.arcs.borrow().get(0).unwrap(), &mut color_idx);
         }
 
         // draw control points
@@ -106,24 +114,23 @@ impl State {
     }
 
     fn draw_node(&self, frame: &mut Frame, node: &Node<ArcNode>, color_idx: &mut i64) {
-        let left = self.arcs.left(node);
-        let right = self.arcs.right(node);
+        let tree = self.arcs.borrow();
 
-        if let Some(left_node) = self.arcs.left(node) {
+        if let Some(left_node) = tree.left(node) {
             self.draw_node(frame, left_node, color_idx);
         }
 
-        if let Some(right_node) = self.arcs.right(node) {
+        if let Some(right_node) = tree.right(node) {
             self.draw_node(frame, right_node, color_idx);
         }
 
-        if let Some(arc) = node.arc {
+        if node.arc.is_some() {
             let color = if *color_idx % 2 == 0 {
                 self.left_color
             } else {
                 self.right_color
             };
-            node.draw_arc(frame, &self.left_color);
+            node.draw_arc(frame, &color);
             *color_idx += 1;
         }
 
@@ -177,7 +184,7 @@ impl<Message> canvas::Program<Message> for State {
                         };
                         self.control = Control::Moving(idx, pts);
                         self.curve.control_pts[idx] = pts;
-                        self.curve.build_biarc(&mut self.arcs, self.num_biarc);
+                        self.curve.build_biarc(self.arcs.clone(), self.num_split);
                     }
                     (event::Status::Captured, None)
                 }
@@ -278,12 +285,13 @@ impl BezierCurve {
         point.y = b0 * (p1.y - p0.y) + b1 * (p2.y - p1.y) + b2 * (p3.y - p2.y);
     }
 
-    fn build_biarc(&self, arcs: &mut Tree<ArcNode>, num_biarc: usize) -> () {
-        let node_n = 2usize.pow((num_biarc + 1) as u32);
+    fn build_biarc(&self, arc_cell: Rc<RefCell<Tree<ArcNode>>>, split_num: usize) -> () {
+        let node_n = 2usize.pow((split_num + 1) as u32);
         let pow_biarc = node_n / 2;
 
-        if node_n != arcs.len() {
-            arcs.set_new_complete(num_biarc);
+        if node_n != arc_cell.borrow().len() {
+            let mut arc_mut = arc_cell.borrow_mut();
+            arc_mut.set_new_complete(split_num, ArcNode::arc_builder(split_num));
         }
 
         let delta = 1.0 / (pow_biarc as f32);
@@ -304,10 +312,8 @@ impl BezierCurve {
 
         let mut i: i32 = 0;
         let mut is_left: bool = true;
-        for node in arcs.post_iter_mut() {
-            // TODO: increment idx only for leaf node;
-            let arc_node = &mut node.value;
 
+        Tree::post_trav(arc_cell.clone(), |arc_node| {
             // leaf node
             if let Some(ref mut arc) = arc_node.arc {
                 // cache joint circle
@@ -395,10 +401,11 @@ impl BezierCurve {
                         arc.angle1 = invert_angle(arc.angle1);
                     }
                 }
+                is_left = !is_left;
             } else {
                 // TODO: draw aabb
             }
-        }
+        });
     }
 }
 
