@@ -320,8 +320,9 @@ impl BezierCurve {
         let mut center = Point::default();
 
         let mut arc_mid = Point::default();
-        let mut center_vec_left = Point::default();
-        let mut center_vec_right = Point::default();
+        let mut tangent_left = Point::default();
+        let mut tangent_right = Point::default();
+        let mut tangent_mid = Point::default();
 
         let mut i: i32 = 0;
         let mut is_left: bool = true;
@@ -394,15 +395,15 @@ impl BezierCurve {
                     // calculate the center and angles of left arc
                     arc_mid.x = (start.x + control.x) / 2.0;
                     arc_mid.y = (start.y + control.y) / 2.0;
-                    center_vec_left.x = u0.y;
-                    center_vec_left.y = -u0.x;
-                    center_vec_right.x = control.y - start.y;
-                    center_vec_right.y = -(control.x - start.x);
+                    tangent_left.x = u0.y;
+                    tangent_left.y = -u0.x;
+                    tangent_right.x = control.y - start.y;
+                    tangent_right.y = -(control.x - start.x);
                     ray_intersection(
                         &start,
-                        &center_vec_left,
+                        &tangent_left,
                         &arc_mid,
-                        &center_vec_right,
+                        &tangent_right,
                         &mut arc.center,
                     );
 
@@ -410,13 +411,15 @@ impl BezierCurve {
                     arc.angle0 = point_angle(&arc.center, &start);
                     arc.angle1 = point_angle(&arc.center, &arc_mid);
                     arc.angle2 = point_angle(&arc.center, &control);
+                    arc_mid.x = arc.center.x + (radius * arc.angle1.cos()) as f32;
+                    arc_mid.y = arc.center.y + (radius * arc.angle1.sin()) as f32;
 
                     // is left arc is larger than half-circle?
-                    let tangent_vec = Point {
+                    let chord_vec = Point {
                         x: control.x - start.x,
                         y: control.y - start.y,
                     };
-                    let l1_angle = vec_angle(&tangent_vec, &u0);
+                    let l1_angle = vec_angle(&chord_vec, &u0);
 
                     // then invert mid-angle
                     if l1_angle > std::f64::consts::FRAC_PI_2 {
@@ -424,19 +427,96 @@ impl BezierCurve {
                     }
 
                     // calculate aabb radius
+                    tangent_right.x = control.y - center.y;
+                    tangent_right.y = center.x - control.x;
+                    ray_intersection(&start, &u0, &control, &tangent_right, &mut tangent_mid);
+
+                    tangent_left.x = (start.x + tangent_mid.x * 2.0) / 3.0;
+                    tangent_left.y = (start.y + tangent_mid.y * 2.0) / 3.0;
+                    tangent_right.x = (control.x + tangent_mid.x * 2.0) / 3.0;
+                    tangent_right.y = (control.y + tangent_mid.y * 2.0) / 3.0;
+
+                    // inlined cubic curve calculation
+                    point_clear(&mut tangent_mid);
+                    point_add_weight_vec(&mut tangent_mid, 0.125, &start);
+                    point_add_weight_vec(&mut tangent_mid, 0.375, &tangent_left);
+                    point_add_weight_vec(&mut tangent_mid, 0.375, &tangent_right);
+                    point_add_weight_vec(&mut tangent_mid, 0.375, &control);
+
+                    arc_node.radius = distance(&arc_mid, &tangent_mid) as f32;
+
+                    println!("rad: {}", arc_node.radius);
+
+                    let mut dist_max = 0.0;
+
+                    {
+                        let tn = t + delta;
+                        let tn_inv = 1.0 - tn;
+                        let t_sq = t * t;
+                        let tn_sq = tn * tn;
+                        let t_inv = 1.0 - t;
+                        let t_inv_sq = t_inv * t_inv;
+                        let tn_inv_sq = tn_inv * tn_inv;
+                        let t_t_inv = t * t_inv;
+                        let tn_tn_inv = tn * tn_inv;
+
+                        let mid_control_left = Point {
+                            x: tn_inv
+                                * (t_inv_sq * self.control_pts[0].x
+                                    + 2. * t_t_inv * self.control_pts[1].x
+                                    + t_sq * self.control_pts[2].x)
+                                + tn * (t_inv_sq * self.control_pts[1].x
+                                    + 2. * t_t_inv * self.control_pts[2].x
+                                    + t_sq * self.control_pts[3].x),
+                            y: tn_inv
+                                * (t_inv_sq * self.control_pts[0].y
+                                    + 2. * t_t_inv * self.control_pts[1].y
+                                    + t_sq * self.control_pts[2].y)
+                                + tn * (t_inv_sq * self.control_pts[1].y
+                                    + 2. * t_t_inv * self.control_pts[2].y
+                                    + t_sq * self.control_pts[3].y),
+                        };
+                        let mid_control_right = Point {
+                            x: t_inv
+                                * (tn_inv_sq * self.control_pts[0].x
+                                    + 2. * tn_tn_inv * self.control_pts[1].x
+                                    + tn_sq * self.control_pts[2].x)
+                                + t * (tn_inv_sq * self.control_pts[1].x
+                                    + 2. * tn_tn_inv * self.control_pts[2].x
+                                    + tn_sq * self.control_pts[3].x),
+                            y: t_inv
+                                * (tn_inv_sq * self.control_pts[0].y
+                                    + 2. * tn_tn_inv * self.control_pts[1].y
+                                    + tn_sq * self.control_pts[2].y)
+                                + t * (tn_inv_sq * self.control_pts[1].y
+                                    + 2. * tn_tn_inv * self.control_pts[2].y
+                                    + tn_sq * self.control_pts[3].y),
+                        };
+                        let mut dist_left = distance(&mid_control_left, &tangent_left);
+                        if dist_max < dist_left {
+                            dist_max = dist_left;
+                        }
+                        dist_left = distance(&mid_control_right, &tangent_right);
+                        if dist_max < dist_left {
+                            dist_max = dist_left;
+                        }
+                    }
+
+                    arc_node.radius += dist_max as f32;
+                    println!("rad: {}", arc_node.radius);
                 } else {
                     // calculate the center and angles of right arc
                     arc_mid.x = (end.x + control.x) / 2.0;
                     arc_mid.y = (end.y + control.y) / 2.0;
-                    center_vec_left.x = u1.y;
-                    center_vec_left.y = -u1.x;
-                    center_vec_right.x = control.y - end.y;
-                    center_vec_right.y = -(control.x - end.x);
+                    tangent_left.x = u1.y;
+                    tangent_left.y = -u1.x;
+                    tangent_right.x = control.y - end.y;
+                    tangent_right.y = -(control.x - end.x);
                     ray_intersection(
                         &end,
-                        &center_vec_left,
+                        &tangent_left,
                         &arc_mid,
-                        &center_vec_right,
+                        &tangent_right,
                         &mut arc.center,
                     );
 
@@ -446,11 +526,11 @@ impl BezierCurve {
                     arc.angle2 = point_angle(&arc.center, &end);
 
                     // is right arc is larger than half-circle?
-                    let tangent_vec = Point {
+                    let chord_vec = Point {
                         x: end.x - control.x,
                         y: end.y - control.y,
                     };
-                    let r1_angle = vec_angle(&tangent_vec, &u1);
+                    let r1_angle = vec_angle(&chord_vec, &u1);
 
                     // then invert mid-angle
                     if r1_angle > std::f64::consts::FRAC_PI_2 {

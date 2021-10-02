@@ -282,29 +282,29 @@ impl ArcBox {
                 p.arc(Arc {
                     center: Point { x, y },
                     radius: r,
-                    start_angle: std::f32::consts::FRAC_PI_2,
-                    end_angle: std::f32::consts::PI,
+                    start_angle: -std::f32::consts::FRAC_PI_2,
+                    end_angle: -std::f32::consts::PI,
                 });
 
                 p.arc(Arc {
                     center: Point { x: x + w, y },
                     radius: r,
                     start_angle: 0.0,
-                    end_angle: std::f32::consts::FRAC_PI_2,
+                    end_angle: -std::f32::consts::FRAC_PI_2,
                 });
 
                 p.arc(Arc {
                     center: Point { x: x + w, y: y + h },
                     radius: r,
-                    start_angle: -std::f32::consts::FRAC_PI_2,
+                    start_angle: std::f32::consts::FRAC_PI_2,
                     end_angle: 0.0,
                 });
 
                 p.arc(Arc {
                     center: Point { x, y: y + h },
                     radius: r,
-                    start_angle: -std::f32::consts::FRAC_PI_2,
-                    end_angle: -std::f32::consts::PI,
+                    start_angle: std::f32::consts::FRAC_PI_2,
+                    end_angle: std::f32::consts::PI,
                 });
             });
             frame.stroke(
