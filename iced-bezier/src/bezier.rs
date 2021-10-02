@@ -26,6 +26,7 @@ pub struct State {
     pub is_dotted: bool,
     pub is_meshed: bool,
     pub num_split: usize,
+    pub aabb_depth: usize,
     pub left_color: Color,
     pub right_color: Color,
 }
@@ -50,6 +51,7 @@ impl State {
             is_dotted: false,
             is_meshed: true,
             num_split: default_num_split,
+            aabb_depth: 1usize,
             left_color: Color::from_rgba8(40, 210, 0, 1.0),
             right_color: Color::from_rgba8(30, 0, 210, 1.0),
         }
@@ -71,7 +73,15 @@ impl State {
 
     pub fn set_num_biarc(&mut self, num_biarc: usize) {
         self.num_split = num_biarc;
+        if self.aabb_depth > num_biarc + 1 {
+            self.aabb_depth = num_biarc + 1;
+        }
         self.curve.build_biarc(self.arcs.clone(), self.num_split);
+        self.request_redraw();
+    }
+
+    pub fn set_aabb_depth(&mut self, aabb_depth: usize) {
+        self.aabb_depth = aabb_depth;
         self.request_redraw();
     }
 

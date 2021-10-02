@@ -1,8 +1,7 @@
 use iced::{
-    executor, keyboard, window, Align, Application, Canvas, Clipboard, Column, Command, Element,
-    Length, Settings, Subscription, Text,
+    button, executor, slider, window, Align, Application, Button, Canvas, Clipboard, Column,
+    Command, Element, Length, Row, Settings, Slider, Text,
 };
-use iced_native::{subscription, Event};
 
 pub mod bezier;
 pub mod biarc;
@@ -22,6 +21,11 @@ pub fn main() -> iced::Result {
 
 struct Bezier {
     canvas: bezier::State,
+    init_state: button::State,
+    dot_state: button::State,
+    mesh_state: button::State,
+    arc_slider_state: slider::State,
+    aabb_slider_state: slider::State,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -29,7 +33,8 @@ enum Message {
     Initialize,
     ToggleDotted,
     ToggleMesh,
-    SetBiarc(usize),
+    SetBiarc(u8),
+    SetAABBDepth(u8),
 }
 
 impl Application for Bezier {
@@ -41,6 +46,11 @@ impl Application for Bezier {
         (
             Bezier {
                 canvas: bezier::State::new(),
+                init_state: Default::default(),
+                dot_state: Default::default(),
+                mesh_state: Default::default(),
+                arc_slider_state: Default::default(),
+                aabb_slider_state: Default::default(),
             },
             Command::none(),
         )
@@ -61,47 +71,85 @@ impl Application for Bezier {
             Message::ToggleMesh => {
                 self.canvas.toggle_meshed();
             }
-            Message::SetBiarc(num_biarc) => {
-                self.canvas.set_num_biarc(num_biarc);
+            Message::SetBiarc(split_biarc) => {
+                self.canvas.set_num_biarc(split_biarc as usize);
+            }
+            Message::SetAABBDepth(aabb_depth) => {
+                self.canvas.set_aabb_depth(aabb_depth as usize);
             }
         }
 
         Command::none()
     }
 
-    fn subscription(&self) -> Subscription<Message> {
-        subscription::events_with(|event, _status| {
-            if let Event::Keyboard(keyboard::Event::KeyPressed { key_code, .. }) = event {
-                return match key_code {
-                    keyboard::KeyCode::I => Some(Message::Initialize),
-                    keyboard::KeyCode::L => Some(Message::ToggleDotted),
-                    keyboard::KeyCode::C => Some(Message::ToggleMesh),
-                    keyboard::KeyCode::Key1 => Some(Message::SetBiarc(1)),
-                    keyboard::KeyCode::Key2 => Some(Message::SetBiarc(2)),
-                    keyboard::KeyCode::Key3 => Some(Message::SetBiarc(3)),
-                    keyboard::KeyCode::Key4 => Some(Message::SetBiarc(4)),
-                    keyboard::KeyCode::Key5 => Some(Message::SetBiarc(5)),
-                    _ => None,
-                };
-            }
-            None
-        })
-    }
-
     fn view(&mut self) -> Element<Message> {
+        let num_split = self.canvas.num_split;
+        let aabb_depth = self.canvas.aabb_depth;
+        let num_string = num_split.to_string();
+        let aabb_string = aabb_depth.to_string();
+
         Column::new()
             .padding(20)
             .spacing(10)
             .align_items(Align::Start)
             .push(
                 Canvas::new(&mut self.canvas)
-                  .width(Length::Fill)
-                  .height(Length::Fill)
+                    .width(Length::Fill)
+                    .height(Length::Fill),
             )
             .push(
-                Text::new("[I]: Initialize control points / [L]: Make line dotted / [C]: Draw control mesh / [1-5]: Draw biarcs (2^n splits)")
-                    .width(Length::Shrink)
-                    .size(20),
+                Row::new()
+                    .padding(5)
+                    .spacing(10)
+                    .align_items(Align::Start)
+                    .push(
+                        Button::new(&mut self.init_state, Text::new("Initialize"))
+                            .padding(8)
+                            .on_press(Message::Initialize),
+                    )
+                    .push(
+                        Button::new(&mut self.mesh_state, Text::new("Draw Mesh"))
+                            .padding(8)
+                            .on_press(Message::ToggleMesh),
+                    )
+                    .push(
+                        Button::new(&mut self.dot_state, Text::new("Dashed"))
+                            .padding(8)
+                            .on_press(Message::ToggleDotted),
+                    )
+                    .push(
+                        Column::new()
+                            .spacing(3)
+                            .align_items(Align::Start)
+                            .push(
+                                Row::new()
+                                    .padding(5)
+                                    .spacing(5)
+                                    .align_items(Align::Center)
+                                    .push(Text::new("Arc Split # ").width(Length::Units(130)))
+                                    .push(Text::new(num_string).width(Length::Units(10)))
+                                    .push(Slider::new(
+                                        &mut self.arc_slider_state,
+                                        1..=5,
+                                        num_split as u8,
+                                        Message::SetBiarc,
+                                    )),
+                            )
+                            .push(
+                                Row::new()
+                                    .padding(5)
+                                    .spacing(5)
+                                    .align_items(Align::Center)
+                                    .push(Text::new("AABB Depth # ").width(Length::Units(130)))
+                                    .push(Text::new(aabb_string).width(Length::Units(10)))
+                                    .push(Slider::new(
+                                        &mut self.aabb_slider_state,
+                                        1..=((num_split + 1) as u8),
+                                        aabb_depth as u8,
+                                        Message::SetAABBDepth,
+                                    )),
+                            ),
+                    ),
             )
             .into()
     }

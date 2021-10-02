@@ -2,7 +2,7 @@
 //
 // https://rust-leipzig.github.io/architecture/2016/12/20/idiomatic-trees-in-rust/
 
-use std::cell::{RefCell, RefMut};
+use std::cell::RefCell;
 use std::ops::Deref;
 use std::rc::Rc;
 
