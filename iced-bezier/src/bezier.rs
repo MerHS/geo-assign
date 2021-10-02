@@ -411,8 +411,8 @@ impl BezierCurve {
                     arc.angle0 = point_angle(&arc.center, &start);
                     arc.angle1 = point_angle(&arc.center, &arc_mid);
                     arc.angle2 = point_angle(&arc.center, &control);
-                    arc_mid.x = arc.center.x + (radius * arc.angle1.cos()) as f32;
-                    arc_mid.y = arc.center.y + (radius * arc.angle1.sin()) as f32;
+                    arc_mid.x = arc.center.x + (arc.radius * arc.angle1.cos() as f32);
+                    arc_mid.y = arc.center.y + (arc.radius * arc.angle1.sin() as f32);
 
                     // is left arc is larger than half-circle?
                     let chord_vec = Point {
@@ -441,16 +441,13 @@ impl BezierCurve {
                     point_add_weight_vec(&mut tangent_mid, 0.125, &start);
                     point_add_weight_vec(&mut tangent_mid, 0.375, &tangent_left);
                     point_add_weight_vec(&mut tangent_mid, 0.375, &tangent_right);
-                    point_add_weight_vec(&mut tangent_mid, 0.375, &control);
+                    point_add_weight_vec(&mut tangent_mid, 0.125, &control);
 
                     arc_node.radius = distance(&arc_mid, &tangent_mid) as f32;
 
-                    println!("rad: {}", arc_node.radius);
-
                     let mut dist_max = 0.0;
-
                     {
-                        let tn = t + delta;
+                        let tn = t + delta / 2.0;
                         let tn_inv = 1.0 - tn;
                         let t_sq = t * t;
                         let tn_sq = tn * tn;
@@ -496,6 +493,7 @@ impl BezierCurve {
                         if dist_max < dist_left {
                             dist_max = dist_left;
                         }
+
                         dist_left = distance(&mid_control_right, &tangent_right);
                         if dist_max < dist_left {
                             dist_max = dist_left;
@@ -503,7 +501,6 @@ impl BezierCurve {
                     }
 
                     arc_node.radius += dist_max as f32;
-                    println!("rad: {}", arc_node.radius);
                 } else {
                     // calculate the center and angles of right arc
                     arc_mid.x = (end.x + control.x) / 2.0;
