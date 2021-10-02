@@ -21,7 +21,7 @@ pub enum Control {
 pub struct State {
     cache: canvas::Cache,
     curve: BezierCurve,
-    arcs: Rc<RefCell<Tree<ArcNode>>>,
+    arcs: Rc<RefCell<Tree<ArcBox>>>,
     control: Control,
     pub is_dotted: bool,
     pub is_meshed: bool,
@@ -37,7 +37,7 @@ impl State {
         let depth = default_num_split + 1;
         let arcs = Rc::new(RefCell::new(Tree::new_complete(
             depth,
-            ArcNode::arc_builder(depth),
+            ArcBox::arc_builder(depth),
         )));
 
         curve.build_biarc(arcs.clone(), default_num_split);
@@ -113,7 +113,7 @@ impl State {
         }
     }
 
-    fn draw_node(&self, frame: &mut Frame, node: &Node<ArcNode>, color_idx: &mut i64) {
+    fn draw_node(&self, frame: &mut Frame, node: &Node<ArcBox>, color_idx: &mut i64) {
         let tree = self.arcs.borrow();
 
         if let Some(left_node) = tree.left(node) {
@@ -285,14 +285,14 @@ impl BezierCurve {
         point.y = b0 * (p1.y - p0.y) + b1 * (p2.y - p1.y) + b2 * (p3.y - p2.y);
     }
 
-    fn build_biarc(&self, arc_cell: Rc<RefCell<Tree<ArcNode>>>, split_num: usize) -> () {
+    fn build_biarc(&self, arc_cell: Rc<RefCell<Tree<ArcBox>>>, split_num: usize) -> () {
         let depth = split_num + 1;
         let node_n = 2usize.pow((depth + 1) as u32) - 1;
         let biarc_n = 2usize.pow(split_num as u32);
 
         if node_n != arc_cell.borrow().len() {
             let mut arc_mut = arc_cell.borrow_mut();
-            arc_mut.set_new_complete(depth, ArcNode::arc_builder(depth));
+            arc_mut.set_new_complete(depth, ArcBox::arc_builder(depth));
         }
 
         let delta = 1.0 / (biarc_n as f32);
@@ -314,7 +314,35 @@ impl BezierCurve {
         let mut i: i32 = 0;
         let mut is_left: bool = true;
 
-        Tree::post_trav(arc_cell.clone(), |arc_node| {
+        Tree::post_trav(arc_cell.clone(), |node_id| {
+            // TODO: merge radius
+            let mut left_aabb: Option<AABB> = None;
+            let mut right_aabb: Option<AABB> = None;
+
+            {
+                let tree = arc_cell.borrow();
+                let node = tree.get(node_id).unwrap();
+                if let Some(left_node) = tree.left(node) {
+                    left_aabb = Some(left_node.aabb.clone());
+                }
+                if let Some(right_node) = tree.right(node) {
+                    right_aabb = Some(right_node.aabb.clone());
+                }
+
+                if let Some(ref left_value) = left_aabb {
+                    if let Some(ref right_value) = right_aabb {
+                        left_aabb = Some(AABB::merge_two(left_value, right_value));
+                    }
+                } else {
+                    if right_aabb.is_some() {
+                        left_aabb = right_aabb
+                    }
+                }
+            }
+
+            let mut tree = arc_cell.borrow_mut();
+            let arc_node = &mut tree.get_mut(node_id).unwrap().value;
+
             // leaf node
             if let Some(ref mut arc) = arc_node.arc {
                 // cache joint circle
@@ -405,8 +433,11 @@ impl BezierCurve {
                 is_left = !is_left;
 
                 // calculate aabb
+                arc_node.aabb = arc.aabb();
             } else {
-                // TODO: calculate aabb with lower case
+                if let Some(left_value) = left_aabb {
+                    arc_node.aabb = left_value;
+                }
             }
         });
     }

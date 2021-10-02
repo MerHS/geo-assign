@@ -2,7 +2,7 @@
 //
 // https://rust-leipzig.github.io/architecture/2016/12/20/idiomatic-trees-in-rust/
 
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -97,7 +97,7 @@ impl<T> Tree<T> {
 
     pub fn post_trav<F>(tree_cell: Rc<RefCell<Tree<T>>>, mut f: F)
     where
-        F: FnMut(&mut T),
+        F: FnMut(usize),
     {
         if tree_cell.borrow().len() > 0 {
             Tree::post_trav_inner(tree_cell.clone(), 0, &mut f);
@@ -106,7 +106,7 @@ impl<T> Tree<T> {
 
     fn post_trav_inner<F>(tree_cell: Rc<RefCell<Tree<T>>>, idx: usize, f: &mut F)
     where
-        F: FnMut(&mut T),
+        F: FnMut(usize),
     {
         let mut left_idx: usize = 0;
         let mut right_idx: usize = 0;
@@ -131,10 +131,7 @@ impl<T> Tree<T> {
             Tree::post_trav_inner(tree_cell.clone(), right_idx, f);
         }
 
-        let mut tree = tree_cell.borrow_mut();
-        let value = &mut tree.nodes.get_mut(idx).unwrap().value;
-
-        f(value);
+        f(idx);
     }
 }
 

@@ -75,7 +75,7 @@ impl ArcData {
         let pi = std::f64::consts::PI;
         let pi2 = std::f64::consts::FRAC_PI_2;
 
-        let mut aabb = aabb = AABB::new_point(
+        let mut aabb = AABB::new_point(
             Point {
                 x: self.center.x + self.radius * f32::cos(a0 as f32),
                 y: self.center.y + self.radius * f32::sin(a0 as f32),
@@ -89,28 +89,83 @@ impl ArcData {
             if pi >= a1 && a1 >= pi2 {
                 // nop
             } else if pi2 > a1 && a1 >= 0.0 {
-
+                aabb.h = self.center.y + self.radius - aabb.y;
             } else if 0.0 > a1 && a1 >= -pi2 {
+                if a0 - a1 > pi {
+                    // counter-clockwise
+                    aabb.w += aabb.x - (self.center.x - self.radius);
+                    aabb.x = self.center.x - self.radius;
+                    aabb.h += aabb.y - (self.center.y - self.radius);
+                    aabb.y = self.center.y - self.radius;
+                } else {
+                    // clockwise
+                    aabb.w = (self.center.x + self.radius) - aabb.x;
+                    aabb.h = (self.center.y + self.radius) - aabb.y;
+                }
             } else if -pi2 > a1 && a1 >= -pi {
+                aabb.w += aabb.x - (self.center.x - self.radius);
+                aabb.x = self.center.x - self.radius;
             }
         } else if pi2 > a0 && a0 >= 0.0 {
             if pi >= a1 && a1 >= pi2 {
+                aabb.h = self.center.y + self.radius - aabb.y;
             } else if pi2 > a1 && a1 >= 0.0 {
                 // nop
             } else if 0.0 > a1 && a1 >= -pi2 {
+                aabb.w = self.center.x + self.radius - aabb.x;
             } else if -pi2 > a1 && a1 >= -pi {
+                if a0 - a1 > pi {
+                    // counter-clockwise
+                    aabb.w += aabb.x - (self.center.x - self.radius);
+                    aabb.x = self.center.x - self.radius;
+                    aabb.h = (self.center.y + self.radius) - aabb.y;
+                } else {
+                    // clockwise
+                    aabb.h += aabb.y - (self.center.y - self.radius);
+                    aabb.y = self.center.y - self.radius;
+                    aabb.w = (self.center.x + self.radius) - aabb.x;
+                }
             }
         } else if 0.0 > a0 && a0 >= -pi2 {
             if pi >= a1 && a1 >= pi2 {
+                if a1 - a0 > pi {
+                    // clockwise
+                    aabb.w += aabb.x - (self.center.x - self.radius);
+                    aabb.x = self.center.x - self.radius;
+                    aabb.h += aabb.y - (self.center.y - self.radius);
+                    aabb.y = self.center.y - self.radius;
+                } else {
+                    // counter-clockwise
+                    aabb.w = (self.center.x + self.radius) - aabb.x;
+                    aabb.h = (self.center.y + self.radius) - aabb.y;
+                }
             } else if pi2 > a1 && a1 >= 0.0 {
+                aabb.w = self.center.x + self.radius - aabb.x;
             } else if 0.0 > a1 && a1 >= -pi2 {
                 // nop
             } else if -pi2 > a1 && a1 >= -pi {
+                aabb.w += aabb.y - (self.center.y - self.radius);
+                aabb.y = self.center.y - self.radius;
             }
         } else if -pi2 > a0 && a0 >= -pi {
             if pi >= a1 && a1 >= pi2 {
+                aabb.w += aabb.x - (self.center.x - self.radius);
+                aabb.x = self.center.x - self.radius;
             } else if pi2 > a1 && a1 >= 0.0 {
+                if a1 - a0 > pi {
+                    // clockwise
+                    aabb.w += aabb.x - (self.center.x - self.radius);
+                    aabb.x = self.center.x - self.radius;
+                    aabb.h = (self.center.y + self.radius) - aabb.y;
+                } else {
+                    // counter-clockwise
+                    aabb.h += aabb.y - (self.center.y - self.radius);
+                    aabb.y = self.center.y - self.radius;
+                    aabb.w = (self.center.x + self.radius) - aabb.x;
+                }
             } else if 0.0 > a1 && a1 >= -pi2 {
+                aabb.w += aabb.y - (self.center.y - self.radius);
+                aabb.y = self.center.y - self.radius;
             } else if -pi2 > a1 && a1 >= -pi {
                 // nop
             }
@@ -120,7 +175,7 @@ impl ArcData {
 }
 
 // AABB origin is bottom-left
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct AABB {
     pub x: f32,
     pub y: f32,
@@ -129,7 +184,7 @@ pub struct AABB {
 }
 
 impl AABB {
-    fn new_point(p0: Point, p1: Point) -> Self {
+    pub fn new_point(p0: Point, p1: Point) -> Self {
         AABB {
             x: if p0.x < p1.x { p0.x } else { p1.x },
             y: if p0.y < p1.y { p0.y } else { p1.y },
@@ -138,7 +193,7 @@ impl AABB {
         }
     }
 
-    fn merge(&mut self, other: &AABB) {
+    pub fn merge(&mut self, other: &AABB) {
         if other.x < self.x {
             self.w += self.x - other.x;
             self.x = other.x;
@@ -154,19 +209,25 @@ impl AABB {
             self.w = other.x + other.w - self.x;
         }
     }
+
+    pub fn merge_two(this: &AABB, other: &AABB) -> AABB {
+        let mut aabb = this.clone();
+        aabb.merge(other);
+        aabb
+    }
 }
 
 #[derive(Debug, Default)]
-pub struct ArcNode {
+pub struct ArcBox {
     pub arc: Option<ArcData>,
     pub aabb: AABB,
     pub radius: f32,
 }
 
-impl ArcNode {
-    pub fn arc_builder(depth: usize) -> Box<dyn Fn(usize) -> ArcNode> {
+impl ArcBox {
+    pub fn arc_builder(depth: usize) -> Box<dyn Fn(usize) -> ArcBox> {
         let leaf_id = 2usize.pow(depth as u32) - 1;
-        Box::new(move |node_id| ArcNode {
+        Box::new(move |node_id| ArcBox {
             arc: if node_id >= leaf_id {
                 Some(ArcData::default())
             } else {
