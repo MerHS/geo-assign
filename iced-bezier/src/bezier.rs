@@ -113,7 +113,7 @@ impl State {
         // draw biarcs
         if self.is_meshed {
             let mut color_idx: i64 = 0;
-            self.draw_node(frame, self.arcs.borrow().get(0).unwrap(), &mut color_idx);
+            self.draw_node(frame, self.arcs.borrow().get(0).unwrap(), &mut color_idx, 0);
         }
 
         // draw control points
@@ -123,15 +123,15 @@ impl State {
         }
     }
 
-    fn draw_node(&self, frame: &mut Frame, node: &Node<ArcBox>, color_idx: &mut i64) {
+    fn draw_node(&self, frame: &mut Frame, node: &Node<ArcBox>, color_idx: &mut i64, depth: usize) {
         let tree = self.arcs.borrow();
 
         if let Some(left_node) = tree.left(node) {
-            self.draw_node(frame, left_node, color_idx);
+            self.draw_node(frame, left_node, color_idx, depth + 1);
         }
 
         if let Some(right_node) = tree.right(node) {
-            self.draw_node(frame, right_node, color_idx);
+            self.draw_node(frame, right_node, color_idx, depth + 1);
         }
 
         if node.arc.is_some() {
@@ -144,7 +144,9 @@ impl State {
             *color_idx += 1;
         }
 
-        node.draw_aabb(frame, &Color::from_rgba8(0, 30, 220, 1.0));
+        if depth + self.aabb_depth >= self.num_split + 2 {
+            node.draw_aabb(frame, &Color::from_rgba8(0, 30, 220, 1.0));
+        }
     }
 }
 

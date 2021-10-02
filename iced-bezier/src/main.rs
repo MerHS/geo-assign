@@ -144,7 +144,7 @@ impl Application for Bezier {
                                     .push(Text::new(aabb_string).width(Length::Units(10)))
                                     .push(Slider::new(
                                         &mut self.aabb_slider_state,
-                                        1..=((num_split + 1) as u8),
+                                        1..=((num_split + 2) as u8),
                                         aabb_depth as u8,
                                         Message::SetAABBDepth,
                                     )),
