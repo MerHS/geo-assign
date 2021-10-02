@@ -403,8 +403,10 @@ impl BezierCurve {
                     }
                 }
                 is_left = !is_left;
+
+                // calculate aabb
             } else {
-                // TODO: draw aabb
+                // TODO: calculate aabb with lower case
             }
         });
     }

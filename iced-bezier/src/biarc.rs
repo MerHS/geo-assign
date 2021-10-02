@@ -25,7 +25,7 @@ impl ArcData {
         frame.stroke(&curve, Stroke::default().with_width(3.0).with_color(*color));
     }
 
-    fn draw_arc(
+    pub fn draw_arc(
         p: &mut iced::canvas::path::Builder,
         center: &Point,
         radius: f32,
@@ -62,6 +62,61 @@ impl ArcData {
             p.line_to(point);
         }
     }
+
+    pub fn aabb(&self) -> AABB {
+        let mut aabb_left = self.aabb_inner(self.angle0, self.angle1);
+        let aabb_right = self.aabb_inner(self.angle1, self.angle2);
+
+        aabb_left.merge(&aabb_right);
+        aabb_left
+    }
+
+    fn aabb_inner(&self, a0: f64, a1: f64) -> AABB {
+        let pi = std::f64::consts::PI;
+        let pi2 = std::f64::consts::FRAC_PI_2;
+
+        let mut aabb = aabb = AABB::new_point(
+            Point {
+                x: self.center.x + self.radius * f32::cos(a0 as f32),
+                y: self.center.y + self.radius * f32::sin(a0 as f32),
+            },
+            Point {
+                x: self.center.x + self.radius * f32::cos(a1 as f32),
+                y: self.center.y + self.radius * f32::sin(a1 as f32),
+            },
+        );
+        if pi >= a0 && a0 >= pi2 {
+            if pi >= a1 && a1 >= pi2 {
+                // nop
+            } else if pi2 > a1 && a1 >= 0.0 {
+
+            } else if 0.0 > a1 && a1 >= -pi2 {
+            } else if -pi2 > a1 && a1 >= -pi {
+            }
+        } else if pi2 > a0 && a0 >= 0.0 {
+            if pi >= a1 && a1 >= pi2 {
+            } else if pi2 > a1 && a1 >= 0.0 {
+                // nop
+            } else if 0.0 > a1 && a1 >= -pi2 {
+            } else if -pi2 > a1 && a1 >= -pi {
+            }
+        } else if 0.0 > a0 && a0 >= -pi2 {
+            if pi >= a1 && a1 >= pi2 {
+            } else if pi2 > a1 && a1 >= 0.0 {
+            } else if 0.0 > a1 && a1 >= -pi2 {
+                // nop
+            } else if -pi2 > a1 && a1 >= -pi {
+            }
+        } else if -pi2 > a0 && a0 >= -pi {
+            if pi >= a1 && a1 >= pi2 {
+            } else if pi2 > a1 && a1 >= 0.0 {
+            } else if 0.0 > a1 && a1 >= -pi2 {
+            } else if -pi2 > a1 && a1 >= -pi {
+                // nop
+            }
+        }
+        aabb
+    }
 }
 
 // AABB origin is bottom-left
@@ -71,6 +126,34 @@ pub struct AABB {
     pub y: f32,
     pub h: f32,
     pub w: f32,
+}
+
+impl AABB {
+    fn new_point(p0: Point, p1: Point) -> Self {
+        AABB {
+            x: if p0.x < p1.x { p0.x } else { p1.x },
+            y: if p0.y < p1.y { p0.y } else { p1.y },
+            h: f32::abs(p0.y - p1.y),
+            w: f32::abs(p0.x - p1.x),
+        }
+    }
+
+    fn merge(&mut self, other: &AABB) {
+        if other.x < self.x {
+            self.w += self.x - other.x;
+            self.x = other.x;
+        }
+        if other.y < self.y {
+            self.h += self.y - other.y;
+            self.y = other.y;
+        }
+        if self.y + self.h < other.y + other.h {
+            self.h = other.y + other.h - self.y;
+        }
+        if self.x + self.w < other.x + other.w {
+            self.w = other.x + other.w - self.x;
+        }
+    }
 }
 
 #[derive(Debug, Default)]
