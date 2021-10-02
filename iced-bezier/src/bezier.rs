@@ -320,8 +320,8 @@ impl BezierCurve {
         let mut center = Point::default();
 
         let mut arc_mid = Point::default();
-        let mut arc_left = Point::default();
-        let mut arc_right = Point::default();
+        let mut center_vec_left = Point::default();
+        let mut center_vec_right = Point::default();
 
         let mut i: i32 = 0;
         let mut is_left: bool = true;
@@ -330,15 +330,20 @@ impl BezierCurve {
             // TODO: merge radius
             let mut left_aabb: Option<AABB> = None;
             let mut right_aabb: Option<AABB> = None;
+            let mut aabb_radius: f32 = 0.0;
 
             {
                 let tree = arc_cell.borrow();
                 let node = tree.get(node_id).unwrap();
                 if let Some(left_node) = tree.left(node) {
                     left_aabb = Some(left_node.aabb.clone());
+                    aabb_radius = left_node.radius;
                 }
                 if let Some(right_node) = tree.right(node) {
                     right_aabb = Some(right_node.aabb.clone());
+                    if aabb_radius < right_node.radius {
+                        aabb_radius = right_node.radius;
+                    }
                 }
 
                 if let Some(ref left_value) = left_aabb {
@@ -389,53 +394,63 @@ impl BezierCurve {
                     // calculate the center and angles of left arc
                     arc_mid.x = (start.x + control.x) / 2.0;
                     arc_mid.y = (start.y + control.y) / 2.0;
-                    arc_left.x = u0.y;
-                    arc_left.y = -u0.x;
-                    arc_right.x = control.y - start.y;
-                    arc_right.y = -(control.x - start.x);
-                    ray_intersection(&start, &arc_left, &arc_mid, &arc_right, &mut arc.center);
+                    center_vec_left.x = u0.y;
+                    center_vec_left.y = -u0.x;
+                    center_vec_right.x = control.y - start.y;
+                    center_vec_right.y = -(control.x - start.x);
+                    ray_intersection(
+                        &start,
+                        &center_vec_left,
+                        &arc_mid,
+                        &center_vec_right,
+                        &mut arc.center,
+                    );
 
-                    let mid_left = Point {
-                        x: (control.x + start.x) / 2.0,
-                        y: (control.y + start.y) / 2.0,
-                    };
                     arc.radius = distance(&arc.center, &start) as f32;
                     arc.angle0 = point_angle(&arc.center, &start);
+                    arc.angle1 = point_angle(&arc.center, &arc_mid);
                     arc.angle2 = point_angle(&arc.center, &control);
 
                     // is left arc is larger than half-circle?
-                    arc_mid.x = control.x - start.x;
-                    arc_mid.y = control.y - start.y;
-                    let l1_angle = vec_angle(&arc_mid, &u0);
-                    arc.angle1 = point_angle(&arc.center, &mid_left);
+                    let tangent_vec = Point {
+                        x: control.x - start.x,
+                        y: control.y - start.y,
+                    };
+                    let l1_angle = vec_angle(&tangent_vec, &u0);
 
                     // then invert mid-angle
                     if l1_angle > std::f64::consts::FRAC_PI_2 {
                         arc.angle1 = invert_angle(arc.angle1);
                     }
+
+                    // calculate aabb radius
                 } else {
                     // calculate the center and angles of right arc
                     arc_mid.x = (end.x + control.x) / 2.0;
                     arc_mid.y = (end.y + control.y) / 2.0;
-                    arc_left.x = u1.y;
-                    arc_left.y = -u1.x;
-                    arc_right.x = control.y - end.y;
-                    arc_right.y = -(control.x - end.x);
-                    ray_intersection(&end, &arc_left, &arc_mid, &arc_right, &mut arc.center);
+                    center_vec_left.x = u1.y;
+                    center_vec_left.y = -u1.x;
+                    center_vec_right.x = control.y - end.y;
+                    center_vec_right.y = -(control.x - end.x);
+                    ray_intersection(
+                        &end,
+                        &center_vec_left,
+                        &arc_mid,
+                        &center_vec_right,
+                        &mut arc.center,
+                    );
 
-                    let mid_right = Point {
-                        x: (control.x + end.x) / 2.0,
-                        y: (control.y + end.y) / 2.0,
-                    };
                     arc.radius = distance(&arc.center, &end) as f32;
                     arc.angle0 = point_angle(&arc.center, &control);
+                    arc.angle1 = point_angle(&arc.center, &arc_mid);
                     arc.angle2 = point_angle(&arc.center, &end);
 
                     // is right arc is larger than half-circle?
-                    arc_mid.x = end.x - control.x;
-                    arc_mid.y = end.y - control.y;
-                    let r1_angle = vec_angle(&arc_mid, &u1);
-                    arc.angle1 = point_angle(&arc.center, &mid_right);
+                    let tangent_vec = Point {
+                        x: end.x - control.x,
+                        y: end.y - control.y,
+                    };
+                    let r1_angle = vec_angle(&tangent_vec, &u1);
 
                     // then invert mid-angle
                     if r1_angle > std::f64::consts::FRAC_PI_2 {
@@ -449,6 +464,7 @@ impl BezierCurve {
             } else {
                 if let Some(left_value) = left_aabb {
                     arc_node.aabb = left_value;
+                    arc_node.radius = aabb_radius;
                 }
             }
         });
