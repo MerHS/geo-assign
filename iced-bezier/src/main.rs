@@ -57,7 +57,7 @@ impl Application for Bezier {
     }
 
     fn title(&self) -> String {
-        String::from("GeoModel Assignment 1 - 2020-29856")
+        String::from("GeoModel Assignment 2")
     }
 
     fn update(&mut self, message: Message, _clipboard: &mut Clipboard) -> Command<Message> {
