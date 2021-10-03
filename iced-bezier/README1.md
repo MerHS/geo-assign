@@ -23,9 +23,9 @@ sudo apt-get install expat libexpat-dev libfontconfig-dev libxkbcommon-dev libxc
 
 ## How to play
 
-* `Arc Split #` 슬라이더를 조절해서 biarc의 갯수를 조절할 수 있다.
-* `AABB Depth #` 슬라이더를 조절해서 AABB 트리를 순회할 때 어느 깊이부터 AABB를 그릴지를 조절할 수 있다.
-
+* `Arc Split #`: 슬라이더를 조절해서 biarc의 갯수를 조절할 수 있다.
+* `AABB Depth #`: 슬라이더를 조절해서 AABB 트리를 순회할 때 어느 깊이부터 AABB를 그릴지를 조절할 수 있다.
+* `Use Bezier AABB`: AABB를 구할 때 arc의 AABB와 arc를 구할때 사용한 bezier curve의 sub-control point의 AABB를 merge한 것을 사용한다. (자세한 것은 후술)
 
 ## How to build
 
@@ -62,7 +62,11 @@ cargo run --release
 
 실제 수업시간 나온 대로 arc를 두 접선들로 이루어진 quadratic bezier curve로 근사하면 arc의 각도가 180도에 가까워질 수록 quadratic bezier curve의 control point가 발산하는 문제가 있어 AABB의 크기도 그만큼 발산하게 된다.
 
-이 문제를 해결하기 위해 여러 방법을 사용해봤지만 만족스럽게 해결하는 방안은 찾지 못했고, 발산하는 부분만 집어서 두 linear 선으로 근사하는 방법도 해봤지만 근사선의 미분연속성이 깨지므로 일단 제출하는 프로그램에서는 수록하지 않았다. 그렇기에 일단 이번 제출 과제에는 수업시간에 배운 AABB 근사 알고리즘을 그대로 적용하였다.
+이 문제를 해결하기 위해 수업시간에 배운 대로 AABB의 오차를 구하지 않고, 기존에 arc를 구할 때 사용하는 bezier curve의 sub-control point, 즉, 기존 bezier curve를 C라고 하면 C(t)와 C(t-delta) 사이의 curve에 대한 control point 4개 (C(t), point0, point1, C(t+ delta))의 AABB를 구한다.
 
-AABB가 발산할 때 어떤 현상이 이루어지는지, 그리고 이를 어떻게 회피할 수 있는지 과제 설명 시간에 알려주었으면 좋을 것 같다.
+그 다음 그 sub-control point들의 AABB를 arc의 AABB와 merge 시키면 arc와 bezier curve 2개를 전부 커버하는 AABB를 구할 수 있다.
+
+sub-control point는 어차피 AABB의 오차를 구할 때 계산해야 하는 값이므로 이 방법으로 하면 좀 더 정확하고 빠른 AABB를 구할 수 있을 것으로 생각된다.
+
+일단 과제 설명 시간에는 AABB가 발산할 때 어떤 현상이 이루어지는지, 그리고 이를 어떻게 회피할 수 있는지 알려주었으면 좋을 것 같다.
 

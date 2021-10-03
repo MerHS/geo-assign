@@ -1,6 +1,6 @@
 use iced::{
-    button, executor, slider, window, Align, Application, Button, Canvas, Clipboard, Column,
-    Command, Element, Length, Row, Settings, Slider, Text,
+    button, executor, slider, window, Align, Application, Button, Canvas, Checkbox, Clipboard,
+    Column, Command, Element, Length, Row, Settings, Slider, Text,
 };
 
 pub mod bezier;
@@ -26,6 +26,7 @@ struct Bezier {
     mesh_state: button::State,
     arc_slider_state: slider::State,
     aabb_slider_state: slider::State,
+    checkbox_state: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -33,6 +34,7 @@ enum Message {
     Initialize,
     ToggleDotted,
     ToggleMesh,
+    ToggleAABB(bool),
     SetBiarc(u8),
     SetAABBDepth(u8),
 }
@@ -51,6 +53,7 @@ impl Application for Bezier {
                 mesh_state: Default::default(),
                 arc_slider_state: Default::default(),
                 aabb_slider_state: Default::default(),
+                checkbox_state: false,
             },
             Command::none(),
         )
@@ -76,6 +79,10 @@ impl Application for Bezier {
             }
             Message::SetAABBDepth(aabb_depth) => {
                 self.canvas.set_aabb_depth(aabb_depth as usize);
+            }
+            Message::ToggleAABB(checked) => {
+                self.checkbox_state = checked;
+                self.canvas.set_bezier_aabb(checked);
             }
         }
 
@@ -103,19 +110,34 @@ impl Application for Bezier {
                     .spacing(10)
                     .align_items(Align::Start)
                     .push(
-                        Button::new(&mut self.init_state, Text::new("Initialize"))
-                            .padding(8)
-                            .on_press(Message::Initialize),
-                    )
-                    .push(
-                        Button::new(&mut self.mesh_state, Text::new("Draw Mesh"))
-                            .padding(8)
-                            .on_press(Message::ToggleMesh),
-                    )
-                    .push(
-                        Button::new(&mut self.dot_state, Text::new("Dashed"))
-                            .padding(8)
-                            .on_press(Message::ToggleDotted),
+                        Column::new()
+                            .spacing(10)
+                            .align_items(Align::Start)
+                            .push(
+                                Row::new()
+                                    .spacing(10)
+                                    .align_items(Align::Start)
+                                    .push(
+                                        Button::new(&mut self.init_state, Text::new("Initialize"))
+                                            .padding(8)
+                                            .on_press(Message::Initialize),
+                                    )
+                                    .push(
+                                        Button::new(&mut self.mesh_state, Text::new("Draw Mesh"))
+                                            .padding(8)
+                                            .on_press(Message::ToggleMesh),
+                                    )
+                                    .push(
+                                        Button::new(&mut self.dot_state, Text::new("Dashed"))
+                                            .padding(8)
+                                            .on_press(Message::ToggleDotted),
+                                    ),
+                            )
+                            .push(Checkbox::new(
+                                self.checkbox_state,
+                                "Use Bezier AABB",
+                                Message::ToggleAABB,
+                            )),
                     )
                     .push(
                         Column::new()

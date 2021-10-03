@@ -25,6 +25,7 @@ pub struct State {
     control: Control,
     pub is_dotted: bool,
     pub is_meshed: bool,
+    pub use_bezier_aabb: bool,
     pub num_split: usize,
     pub aabb_depth: usize,
     pub left_color: Color,
@@ -41,7 +42,7 @@ impl State {
             ArcBox::arc_builder(depth),
         )));
 
-        curve.build_biarc(arcs.clone(), default_num_split);
+        curve.build_biarc(arcs.clone(), default_num_split, false);
 
         State {
             cache: Default::default(),
@@ -50,6 +51,7 @@ impl State {
             control: Control::Static,
             is_dotted: false,
             is_meshed: true,
+            use_bezier_aabb: false,
             num_split: default_num_split,
             aabb_depth: 1usize,
             left_color: Color::from_rgba8(40, 210, 0, 1.0),
@@ -71,12 +73,20 @@ impl State {
         self.request_redraw();
     }
 
+    pub fn set_bezier_aabb(&mut self, checked: bool) {
+        self.use_bezier_aabb = checked;
+        self.curve
+            .build_biarc(self.arcs.clone(), self.num_split, self.use_bezier_aabb);
+        self.request_redraw();
+    }
+
     pub fn set_num_biarc(&mut self, num_biarc: usize) {
         self.num_split = num_biarc;
         if self.aabb_depth > num_biarc + 1 {
             self.aabb_depth = num_biarc + 1;
         }
-        self.curve.build_biarc(self.arcs.clone(), self.num_split);
+        self.curve
+            .build_biarc(self.arcs.clone(), self.num_split, self.use_bezier_aabb);
         self.request_redraw();
     }
 
@@ -196,7 +206,11 @@ impl<Message> canvas::Program<Message> for State {
                         };
                         self.control = Control::Moving(idx, pts);
                         self.curve.control_pts[idx] = pts;
-                        self.curve.build_biarc(self.arcs.clone(), self.num_split);
+                        self.curve.build_biarc(
+                            self.arcs.clone(),
+                            self.num_split,
+                            self.use_bezier_aabb,
+                        );
                     }
                     (event::Status::Captured, None)
                 }
@@ -297,7 +311,12 @@ impl BezierCurve {
         point.y = b0 * (p1.y - p0.y) + b1 * (p2.y - p1.y) + b2 * (p3.y - p2.y);
     }
 
-    fn build_biarc(&self, arc_cell: Rc<RefCell<Tree<ArcBox>>>, split_num: usize) -> () {
+    fn build_biarc(
+        &self,
+        arc_cell: Rc<RefCell<Tree<ArcBox>>>,
+        split_num: usize,
+        use_bezier_aabb: bool,
+    ) -> () {
         let depth = split_num + 1;
         let node_n = 2usize.pow((depth + 1) as u32) - 1;
         let biarc_n = 2usize.pow(split_num as u32);
@@ -309,6 +328,7 @@ impl BezierCurve {
 
         let delta = 1.0 / (biarc_n as f32);
         let mut start = Point::default();
+        let mut mid = Point::default();
         let mut end = Point::default();
         let mut control = Point::default();
         let mut u0 = Point::default();
@@ -370,6 +390,8 @@ impl BezierCurve {
                     self.cubic_curve_to(&mut start, t);
                     self.cubic_deriv_to(&mut u0, t);
                     normalize(&mut u0);
+
+                    self.cubic_curve_to(&mut mid, t + delta * 0.5);
 
                     self.cubic_curve_to(&mut end, t + delta);
                     self.cubic_deriv_to(&mut u1, t + delta);
@@ -447,7 +469,7 @@ impl BezierCurve {
                     arc_node.radius = distance(&arc_mid, &tangent_mid) as f32;
 
                     let mut dist_max = 0.0;
-                    {
+                    let bezier_aabb = {
                         let tn = t + delta / 2.0;
                         let tn_inv = 1.0 - tn;
                         let t_sq = t * t;
@@ -499,9 +521,30 @@ impl BezierCurve {
                         if dist_max < dist_left {
                             dist_max = dist_left;
                         }
-                    }
+
+                        if use_bezier_aabb {
+                            let mut aabb = AABB::new_point(start, mid_control_left);
+                            let aabb2 = AABB::new_point(mid_control_right, mid);
+                            aabb.merge(&aabb2);
+                            Some(aabb)
+                        } else {
+                            None
+                        }
+                    };
 
                     arc_node.radius += dist_max as f32;
+                    arc_node.aabb = arc.aabb();
+
+                    if use_bezier_aabb {
+                        let mut aabb2 = bezier_aabb.unwrap();
+                        aabb2.merge(&arc_node.aabb);
+                        if aabb2.h < arc_node.aabb.h + 2.0 * arc_node.radius
+                            && aabb2.w < arc_node.aabb.w + 2.0 * arc_node.radius
+                        {
+                            arc_node.radius = 0.0;
+                            arc_node.aabb = aabb2.clone();
+                        }
+                    }
                 } else {
                     // calculate the center and angles of right arc
                     arc_mid.x = (end.x + control.x) / 2.0;
@@ -558,7 +601,7 @@ impl BezierCurve {
                     arc_node.radius = distance(&arc_mid, &tangent_mid) as f32;
 
                     let mut dist_max = 0.0;
-                    {
+                    let bezier_aabb = {
                         let t = delta * ((i - 1) as f32 + 0.5);
                         let tn = t + (delta / 2.0);
                         let tn_inv = 1.0 - tn;
@@ -611,14 +654,35 @@ impl BezierCurve {
                         if dist_max < dist_left {
                             dist_max = dist_left;
                         }
-                    }
+
+                        if use_bezier_aabb {
+                            let mut aabb = AABB::new_point(mid, mid_control_left);
+                            let aabb2 = AABB::new_point(mid_control_right, end);
+                            aabb.merge(&aabb2);
+                            Some(aabb)
+                        } else {
+                            None
+                        }
+                    };
 
                     arc_node.radius += dist_max as f32;
+                    arc_node.aabb = arc.aabb();
+
+                    if use_bezier_aabb {
+                        let mut aabb2 = bezier_aabb.unwrap();
+                        aabb2.merge(&arc_node.aabb);
+                        if aabb2.h < arc_node.aabb.h + 2.0 * arc_node.radius
+                            && aabb2.w < arc_node.aabb.w + 2.0 * arc_node.radius
+                        {
+                            arc_node.radius = 0.0;
+                            arc_node.aabb = aabb2.clone();
+                        }
+                    }
                 }
                 is_left = !is_left;
 
                 // calculate aabb
-                arc_node.aabb = arc.aabb();
+                // arc_node.aabb = arc.aabb();
             } else {
                 if let Some(left_value) = left_aabb {
                     arc_node.aabb = left_value;
