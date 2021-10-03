@@ -427,8 +427,8 @@ impl BezierCurve {
                     }
 
                     // calculate aabb radius
-                    tangent_right.x = control.y - center.y;
-                    tangent_right.y = center.x - control.x;
+                    tangent_right.x = control.y - arc.center.y;
+                    tangent_right.y = arc.center.x - control.x;
                     ray_intersection(&start, &u0, &control, &tangent_right, &mut tangent_mid);
 
                     tangent_left.x = (start.x + tangent_mid.x * 2.0) / 3.0;
@@ -521,6 +521,8 @@ impl BezierCurve {
                     arc.angle0 = point_angle(&arc.center, &control);
                     arc.angle1 = point_angle(&arc.center, &arc_mid);
                     arc.angle2 = point_angle(&arc.center, &end);
+                    arc_mid.x = arc.center.x + (arc.radius * arc.angle1.cos() as f32);
+                    arc_mid.y = arc.center.y + (arc.radius * arc.angle1.sin() as f32);
 
                     // is right arc is larger than half-circle?
                     let chord_vec = Point {
@@ -533,6 +535,83 @@ impl BezierCurve {
                     if r1_angle > std::f64::consts::FRAC_PI_2 {
                         arc.angle1 = invert_angle(arc.angle1);
                     }
+
+                    // calculate aabb radius
+                    tangent_right.x = control.y - arc.center.y;
+                    tangent_right.y = arc.center.x - control.x;
+                    ray_intersection(&end, &u1, &control, &tangent_right, &mut tangent_mid);
+
+                    tangent_left.x = (control.x + tangent_mid.x * 2.0) / 3.0;
+                    tangent_left.y = (control.y + tangent_mid.y * 2.0) / 3.0;
+                    tangent_right.x = (end.x + tangent_mid.x * 2.0) / 3.0;
+                    tangent_right.y = (end.y + tangent_mid.y * 2.0) / 3.0;
+
+                    // inlined cubic curve calculation
+                    point_clear(&mut tangent_mid);
+                    point_add_weight_vec(&mut tangent_mid, 0.125, &control);
+                    point_add_weight_vec(&mut tangent_mid, 0.375, &tangent_left);
+                    point_add_weight_vec(&mut tangent_mid, 0.375, &tangent_right);
+                    point_add_weight_vec(&mut tangent_mid, 0.125, &end);
+
+                    arc_node.radius = distance(&arc_mid, &tangent_mid) as f32;
+
+                    let mut dist_max = 0.0;
+                    {
+                        let t = delta * ((i - 1) as f32 + 0.5);
+                        let tn = t + (delta / 2.0);
+                        let tn_inv = 1.0 - tn;
+                        let t_sq = t * t;
+                        let tn_sq = tn * tn;
+                        let t_inv = 1.0 - t;
+                        let t_inv_sq = t_inv * t_inv;
+                        let tn_inv_sq = tn_inv * tn_inv;
+                        let t_t_inv = t * t_inv;
+                        let tn_tn_inv = tn * tn_inv;
+
+                        let mid_control_left = Point {
+                            x: tn_inv
+                                * (t_inv_sq * self.control_pts[0].x
+                                    + 2. * t_t_inv * self.control_pts[1].x
+                                    + t_sq * self.control_pts[2].x)
+                                + tn * (t_inv_sq * self.control_pts[1].x
+                                    + 2. * t_t_inv * self.control_pts[2].x
+                                    + t_sq * self.control_pts[3].x),
+                            y: tn_inv
+                                * (t_inv_sq * self.control_pts[0].y
+                                    + 2. * t_t_inv * self.control_pts[1].y
+                                    + t_sq * self.control_pts[2].y)
+                                + tn * (t_inv_sq * self.control_pts[1].y
+                                    + 2. * t_t_inv * self.control_pts[2].y
+                                    + t_sq * self.control_pts[3].y),
+                        };
+                        let mid_control_right = Point {
+                            x: t_inv
+                                * (tn_inv_sq * self.control_pts[0].x
+                                    + 2. * tn_tn_inv * self.control_pts[1].x
+                                    + tn_sq * self.control_pts[2].x)
+                                + t * (tn_inv_sq * self.control_pts[1].x
+                                    + 2. * tn_tn_inv * self.control_pts[2].x
+                                    + tn_sq * self.control_pts[3].x),
+                            y: t_inv
+                                * (tn_inv_sq * self.control_pts[0].y
+                                    + 2. * tn_tn_inv * self.control_pts[1].y
+                                    + tn_sq * self.control_pts[2].y)
+                                + t * (tn_inv_sq * self.control_pts[1].y
+                                    + 2. * tn_tn_inv * self.control_pts[2].y
+                                    + tn_sq * self.control_pts[3].y),
+                        };
+                        let mut dist_left = distance(&mid_control_left, &tangent_left);
+                        if dist_max < dist_left {
+                            dist_max = dist_left;
+                        }
+
+                        dist_left = distance(&mid_control_right, &tangent_right);
+                        if dist_max < dist_left {
+                            dist_max = dist_left;
+                        }
+                    }
+
+                    arc_node.radius += dist_max as f32;
                 }
                 is_left = !is_left;
 
