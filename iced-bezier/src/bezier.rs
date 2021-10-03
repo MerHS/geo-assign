@@ -411,8 +411,6 @@ impl BezierCurve {
                     arc.angle0 = point_angle(&arc.center, &start);
                     arc.angle1 = point_angle(&arc.center, &arc_mid);
                     arc.angle2 = point_angle(&arc.center, &control);
-                    arc_mid.x = arc.center.x + (arc.radius * arc.angle1.cos() as f32);
-                    arc_mid.y = arc.center.y + (arc.radius * arc.angle1.sin() as f32);
 
                     // is left arc is larger than half-circle?
                     let chord_vec = Point {
@@ -425,6 +423,9 @@ impl BezierCurve {
                     if l1_angle > std::f64::consts::FRAC_PI_2 {
                         arc.angle1 = invert_angle(arc.angle1);
                     }
+
+                    arc_mid.x = arc.center.x + (arc.radius * arc.angle1.cos() as f32);
+                    arc_mid.y = arc.center.y + (arc.radius * arc.angle1.sin() as f32);
 
                     // calculate aabb radius
                     tangent_right.x = control.y - arc.center.y;
@@ -521,8 +522,6 @@ impl BezierCurve {
                     arc.angle0 = point_angle(&arc.center, &control);
                     arc.angle1 = point_angle(&arc.center, &arc_mid);
                     arc.angle2 = point_angle(&arc.center, &end);
-                    arc_mid.x = arc.center.x + (arc.radius * arc.angle1.cos() as f32);
-                    arc_mid.y = arc.center.y + (arc.radius * arc.angle1.sin() as f32);
 
                     // is right arc is larger than half-circle?
                     let chord_vec = Point {
@@ -535,6 +534,9 @@ impl BezierCurve {
                     if r1_angle > std::f64::consts::FRAC_PI_2 {
                         arc.angle1 = invert_angle(arc.angle1);
                     }
+
+                    arc_mid.x = arc.center.x + (arc.radius * arc.angle1.cos() as f32);
+                    arc_mid.y = arc.center.y + (arc.radius * arc.angle1.sin() as f32);
 
                     // calculate aabb radius
                     tangent_right.x = control.y - arc.center.y;

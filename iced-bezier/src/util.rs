@@ -99,3 +99,17 @@ pub fn invert_angle(angle: f64) -> f64 {
     }
     ret
 }
+
+// calculate distance of angle (<= pi)
+pub fn diff_angle(angle0: f64, angle1: f64) -> f64 {
+    let result = if angle0 > angle1 {
+        angle0 - angle1
+    } else {
+        angle1 - angle0
+    };
+    if result > std::f64::consts::PI {
+        2.0 * std::f64::consts::PI - result
+    } else {
+        result
+    }
+}
