@@ -1,7 +1,5 @@
 # Geometric Modeling 21' Fall - ASSIGNMENT 1
 
-* 2020-29856 Ho Young Jhoo
-
 ## How to run
 
 ### Windows
